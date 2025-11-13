@@ -1,3 +1,3 @@
-package build_info
+package buildInfo
 
 const BUILD_ARC = "arm"

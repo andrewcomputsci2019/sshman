@@ -1,4 +1,4 @@
-package build_info
+package buildInfo
 
 // BUILD_MAJOR major build version
 const BUILD_Major = 0
