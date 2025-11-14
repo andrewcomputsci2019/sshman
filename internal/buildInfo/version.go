@@ -1,13 +1,13 @@
 package buildInfo
 
-// BUILD_MAJOR major build version
-const BUILD_Major = 0
+// BuildMajor major build version
+const BuildMajor = 0
 
-// BUILD_MINOR minor build version
-const BUILD_Minor = 0
+// BuildMinor minor build version
+const BuildMinor = 0
 
-// BUILD_PATCH
-const BUILD_Patch = 0
+// BuildPatch patch build version
+const BuildPatch = 0
 
-// BUILD_Date specifies the build date of the application
-var BUILD_Date string
+// BuildDate specifies the build date of the application
+var BuildDate string
