@@ -100,7 +100,8 @@ func main() {
 		os.Exit(0)
 	}
 	if *printConfig {
-		// todo print config out to console
+		config.PrintConfig(cfg)
+		os.Exit(0)
 	}
 	/*
 		LoadDatabase here
