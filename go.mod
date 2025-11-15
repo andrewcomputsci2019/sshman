@@ -2,7 +2,11 @@ module andrew/sshman
 
 go 1.25.4
 
-require zombiezen.com/go/sqlite v1.4.2
+require (
+	github.com/adrg/xdg v0.5.3
+	github.com/goccy/go-yaml v1.18.0
+	zombiezen.com/go/sqlite v1.4.2
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
