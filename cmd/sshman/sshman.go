@@ -89,7 +89,12 @@ func main() {
 	/*
 		Load Config here
 	*/
-	_ = config.LoadConfig()
+	cfg := config.LoadConfig()
+	err := config.ValidateConfig(&cfg)
+	if err != nil {
+		slog.Error("Error validating config", "error", err)
+		os.Exit(1)
+	}
 
 	if *validateConfig {
 		os.Exit(0)
