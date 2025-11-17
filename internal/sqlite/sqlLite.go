@@ -56,18 +56,23 @@ func (conn *Connection) createTable() error {
 	CREATE TABLE IF NOT EXISTS hosts (
 		host TEXT NOT NULL PRIMARY KEY,
 		created_at INTEGER NOT NULL,
-		updated_at INTEGER
+		updated_at INTEGER,
+		last_connected INTEGER,
 	);
 	
-	CREATE TABLE IF NOT EXISTS host_config_options (
+	CREATE TABLE IF NOT EXISTS host_options (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		host TEXT NOT NULL REFERENCES hosts(host) ON DELETE CASCADE,
 		key TEXT NOT NULL,
-		value TEXT NOT NULL
+		value TEXT NOT NULL,
+	    UNIQUE(host, key, value)
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_host_options_host
-	ON host_config_options(host);
+	ON host_options(host);
+
+    CREATE INDEX IF NOT EXISTS idx_host_options_key
+    ON host_options(key)
 	`
 	err := sqlitex.ExecScript(sqlCon, createTableString)
 	if err != nil {
@@ -162,6 +167,19 @@ func (conn *Connection) executeNamedBatch(statements ...executeObjectName) error
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (conn *Connection) transaction(fn func() error) error {
+	endFn, err := sqlitex.ImmediateTransaction(conn.conn)
+	if err != nil {
+		return err
+	}
+	defer endFn(&err)
+	err = fn()
+	if err != nil {
+		return err
 	}
 	return nil
 }
