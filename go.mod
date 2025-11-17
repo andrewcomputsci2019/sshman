@@ -6,6 +6,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/goccy/go-yaml v1.18.0
+	github.com/kevinburke/ssh_config v1.4.0
 	zombiezen.com/go/sqlite v1.4.2
 )
 
