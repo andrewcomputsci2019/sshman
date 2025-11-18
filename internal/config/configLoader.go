@@ -86,29 +86,6 @@ func ValidateConfig(config *Config) error {
 		}
 	}
 
-	if config.SshConf.SshConfigEnabled {
-		sshFilePath := config.SshConf.SshConfigPath
-		if sshFilePath != "" {
-			_, err := os.Stat(sshFilePath)
-			if err != nil {
-				source, errorYml := yaml.PathString("$.ssh_config.config_path")
-				if errorYml != nil {
-					return err
-				}
-				annotation, errorYml := source.AnnotateSource(ymlString, true)
-				if errorYml != nil {
-					return err
-				}
-				fmt.Printf("ssh config file doesnt exist at: %s\n%s\n", sshFilePath, string(annotation))
-				return err
-			}
-		}
-	} else {
-		if config.SshConf.SshConfigPath != "" {
-			slog.Warn("ssh config file path given but config disables ssh config files. Enable ssh_conf.enabled in yaml file if you want config to load ssh config file")
-		}
-	}
-
 	if config.Ssh.ExcPath != "" {
 		fileInfo, err := os.Stat(config.Ssh.ExcPath)
 		if err != nil {
