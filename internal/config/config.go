@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -10,6 +9,8 @@ import (
 )
 
 type ConflictPolicy string
+
+const AppName = "ssh_man"
 
 const (
 	ConflictIgnore      ConflictPolicy = "ignore"       // ignore conflicts dont sync data stores
@@ -30,15 +31,9 @@ var KeyGenTypeSet = map[string]struct{}{
 }
 
 type Config struct {
-	SshConf     SshConfig     `yaml:"ssh_config"`
 	StorageConf StorageConfig `yaml:"storage_config"`
 	Ssh         SSH           `yaml:"ssh"`
 	EnablePing  bool          `yaml:"enable_ping"` // trys to ping host to see if they are connected and reports their ping
-}
-
-type SshConfig struct {
-	SshConfigEnabled bool   `yaml:"enabled"`
-	SshConfigPath    string `yaml:"config_path,omitempty"`
 }
 
 type StorageConfig struct {
@@ -62,22 +57,6 @@ func (cfg *Config) String() string {
 	builder.WriteString("config:\n")
 	builder.WriteString("Ping Enabled: ")
 	builder.WriteString(strconv.FormatBool(cfg.EnablePing) + "\n")
-	builder.WriteString("SSH_CONFIG:\n")
-	builder.WriteString("\tSSH Config Enabled: ")
-	builder.WriteString(strconv.FormatBool(cfg.SshConf.SshConfigEnabled) + "\n")
-	if cfg.SshConf.SshConfigEnabled {
-		builder.WriteString("\tSSH Config Path: ")
-		if cfg.SshConf.SshConfigPath == "" {
-			pathBase, err := os.UserHomeDir()
-			if err != nil {
-				pathBase = "~/"
-			}
-			path := pathBase + DefaultConfigPath
-			builder.WriteString(path + "\n")
-		} else {
-			builder.WriteString(cfg.SshConf.SshConfigPath + "\n")
-		}
-	}
 	builder.WriteString("STORAGE_CONFIG:\n")
 	builder.WriteString("\tStorage Path: ")
 	if cfg.StorageConf.StoragePath == "" {
