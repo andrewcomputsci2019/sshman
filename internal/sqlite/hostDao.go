@@ -324,8 +324,38 @@ func (dao *HostDao) Get(host string) (Host, error) {
 }
 
 func (dao *HostDao) GetN(n uint, offset uint) ([]Host, error) {
-
-	return nil, nil
+	queryString := `SELECT * FROM host LIMIT ? OFFSET ?`
+	queryOptString := `SELECT * FROM host_options where host = ?`
+	hosts := make([]*Host, 0)
+	err := dao.conn.query(queryString, func(stmt *sqlite.Stmt) error {
+		hostItem := &Host{}
+		err := dao.serializeHostFromStatement(stmt, hostItem)
+		if err != nil {
+			return err
+		}
+		hosts = append(hosts, hostItem)
+		return nil
+	}, n, offset)
+	if err != nil {
+		return nil, err
+	}
+	for _, host := range hosts {
+		err = dao.conn.query(queryOptString, func(stmt *sqlite.Stmt) error {
+			err := dao.serializeHostOptionFromStatement(stmt, host)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, host.Host)
+		if err != nil {
+			return nil, err
+		}
+	}
+	res := make([]Host, 0)
+	for _, host := range hosts {
+		res = append(res, *host)
+	}
+	return res, nil
 }
 
 func (dao *HostDao) GetAll() ([]Host, error) {
@@ -386,7 +416,7 @@ func (dao *HostDao) CountOpts(host string) (uint, error) {
 	err := dao.conn.query(queryString, func(stmt *sqlite.Stmt) error {
 		count = uint(stmt.ColumnInt64(0))
 		return nil
-	})
+	}, host)
 	if err != nil {
 		return 0, err
 	}
