@@ -58,6 +58,7 @@ func (conn *Connection) createTable() error {
 		created_at INTEGER NOT NULL,
 		updated_at INTEGER,
 		last_connected INTEGER,
+		notes TEXT,
 	);
 	
 	CREATE TABLE IF NOT EXISTS host_options (

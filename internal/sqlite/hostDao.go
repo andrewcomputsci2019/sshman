@@ -13,6 +13,7 @@ type Host struct {
 	CreatedAt      time.Time
 	UpdatedAt      *time.Time // may be nil
 	LastConnection *time.Time
+	Notes          string
 	Options        []HostOptions
 }
 
@@ -28,12 +29,12 @@ type HostDao struct {
 }
 
 const (
-	hostInsertString    = `INSERT INTO host (host,created_at,updated_at,last_connection) VALUES (?,?,?,?)`
+	hostInsertString    = `INSERT INTO host (host,created_at,updated_at,last_connection,notes) VALUES (?,?,?,?,?)`
 	hostOptInsertString = `INSERT INTO host_options (host, key, value) VALUES (?,?,?)`
-	hostUpdateString    = `UPDATE host SET (created_at, updated_at, last_connection) VALUES (?,?,?) WHERE host=?`
+	hostUpdateString    = `UPDATE host SET (created_at, updated_at, last_connection,notes) VALUES (?,?,?,?) WHERE host=?`
 	hostOptUpdateString = `INSERT OR IGNORE INTO host_options (host, key, value) VALUES (?, ?, ?);`
-	hostUpSert          = `INSERT INTO host (host, created_at, updated_at, last_connection) VALUES (?, ?, ?, ?) 
-ON CONFLICT(host) DO UPDATE SET updated_at=MAX(host.updated_at,excluded.updated_at), last_connection=MAX(host.last_connection, excluded.last_connection);`
+	hostUpSert          = `INSERT INTO host (host, created_at, updated_at, last_connection,notes) VALUES (?, ?, ?, ?, ?) 
+ON CONFLICT(host) DO UPDATE SET updated_at=MAX(host.updated_at,excluded.updated_at), last_connection=MAX(host.last_connection, excluded.last_connection), notes=excluded.notes;`
 	hostDeleteString = `DELETE FROM host WHERE host=?`
 )
 
@@ -48,7 +49,7 @@ func (dao *HostDao) Insert(host Host) error {
 	insertHostString := hostInsertString
 	insertOptString := hostOptInsertString
 	err := dao.conn.transaction(func() error {
-		err := dao.conn.execute(insertHostString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection)
+		err := dao.conn.execute(insertHostString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection, host.Notes)
 		if err != nil {
 			return err
 		}
@@ -133,7 +134,7 @@ func (dao *HostDao) InsertMany(hosts ...Host) error {
 	hostOptInsertString := hostOptInsertString
 	err := dao.conn.transaction(func() error {
 		for _, host := range hosts {
-			err := dao.conn.execute(hostInsertString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection)
+			err := dao.conn.execute(hostInsertString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection, host.Notes)
 			if err != nil {
 				return err
 			}
@@ -189,7 +190,7 @@ func (dao *HostDao) InsertOrUpdate(host Host) error {
 		hostUpSertString := hostUpSert
 		hostOptUpdate := hostOptUpdateString
 		deleteOptString, args := generateDeleteStringOpts(&host)
-		err := dao.conn.execute(hostUpSertString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection)
+		err := dao.conn.execute(hostUpSertString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection, host.Notes)
 		if err != nil {
 			return err
 		}
@@ -217,7 +218,7 @@ func (dao *HostDao) InsertOrUpdateMany(hosts ...Host) error {
 		hostOptUpdate := hostOptUpdateString
 		for _, host := range hosts {
 			deleteOptString, args := generateDeleteStringOpts(&host)
-			err := dao.conn.execute(hostUpSertString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection)
+			err := dao.conn.execute(hostUpSertString, host.Host, host.CreatedAt, host.UpdatedAt, host.LastConnection, host.Notes)
 			if err != nil {
 				return err
 			}
@@ -265,6 +266,7 @@ func (dao *HostDao) serializeHostFromStatement(stmt *sqlite.Stmt, host *Host) er
 		host.LastConnection = new(time.Time)
 		*host.LastConnection = time.UnixMilli(stmt.ColumnInt64(lastConnectionIdx))
 	}
+	host.Notes = stmt.GetText("notes")
 	return nil
 }
 
