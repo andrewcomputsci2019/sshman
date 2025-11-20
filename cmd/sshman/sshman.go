@@ -45,6 +45,7 @@ func main() {
 	port := flags.NewUintSettableFlag("p", 0, "ssh port")
 	identityFile := flags.NewStringSettableFlag("i", "", "identity file")
 	sshConfigFile := flags.NewStringSettableFlag("f", "", "ssh config file")
+	forceSync := flag.Bool("fs", false, "force sync, ignores checksum and attempts to sync database with provided config file")
 
 	var optionFlags optionFlags
 	flag.Var(&optionFlags, "o",
@@ -131,6 +132,10 @@ func main() {
 
 	if *quickSync {
 		_ = sshConfigFile
+		if forceSync != nil && *forceSync {
+
+		}
+		// check checksum and see if file has already been checked against
 		os.Exit(0)
 	}
 
