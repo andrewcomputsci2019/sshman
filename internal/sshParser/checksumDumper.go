@@ -17,7 +17,7 @@ const (
 	checksumDir = "checksums"
 )
 
-// todo verify this function correctly works
+// todo add test
 
 // IsSame checks if checksum is identical to previous know version
 func IsSame(file string) (bool, error) {
@@ -52,8 +52,7 @@ func IsSame(file string) (bool, error) {
 	return bytes.Equal(checksum, data), nil
 }
 
-// todo test that code correctly
-
+// DumpCheckSum dumps file hash checksum to file
 func DumpCheckSum(file string) error {
 	filename := path.Base(file)
 	ext := path.Ext(filename)
