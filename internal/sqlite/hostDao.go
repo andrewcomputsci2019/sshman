@@ -2,12 +2,14 @@ package sqlite
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"zombiezen.com/go/sqlite"
 )
 
+// todo add tags object
 type Host struct {
 	Host           string
 	CreatedAt      time.Time
@@ -17,11 +19,55 @@ type Host struct {
 	Options        []HostOptions
 }
 
+func (h *Host) String() string {
+	builder := strings.Builder{}
+	builder.WriteString("{\n")
+	builder.WriteString("Host: ")
+	builder.WriteString(h.Host + ",\n")
+	builder.WriteString("CreatedAt: ")
+	builder.WriteString(strconv.FormatInt(h.CreatedAt.UnixMilli(), 10))
+	builder.WriteString(",\n")
+	builder.WriteString("UpdatedAt: ")
+	if h.UpdatedAt != nil {
+		builder.WriteString(strconv.FormatInt(h.UpdatedAt.UnixMilli(), 10))
+		builder.WriteString(",\n")
+	} else {
+		builder.WriteString("<nil>,\n")
+	}
+	builder.WriteString("LastConnection: ")
+	if h.LastConnection != nil {
+		builder.WriteString(strconv.FormatInt(h.LastConnection.UnixMilli(), 10))
+		builder.WriteString(",\n")
+	} else {
+		builder.WriteString("<nil>,\n")
+	}
+	builder.WriteString("Notes: ")
+	if h.Notes != "" {
+		builder.WriteString(h.Notes)
+	} else {
+		builder.WriteString("<nil>,\n")
+	}
+	builder.WriteString(",\n")
+	builder.WriteString("Options: [")
+	for i, opt := range h.Options {
+		if i < len(h.Options)-1 {
+			builder.WriteString(",")
+		}
+		builder.WriteString(opt.String())
+	}
+	builder.WriteString("],\n")
+	return builder.String()
+}
+
 type HostOptions struct {
 	ID    int64
 	Key   string
 	Value string
 	Host  string
+}
+
+func (h *HostOptions) String() string {
+	return fmt.Sprintf("{ID: %d, Key: %s, Value: %s}", h.ID, h.Key, h.Value)
 }
 
 type HostDao struct {
@@ -105,7 +151,7 @@ func generateDeleteStringOpts(host *Host) (string, []any) {
 	args := make([]any, 0, len(host.Options)*3+1)
 
 	for i, opt := range host.Options {
-		if i > 0 {
+		if i < len(host.Options)-1 {
 			deleteBuilder.WriteString(", ")
 		}
 		deleteBuilder.WriteString("(?, ?, ?)")

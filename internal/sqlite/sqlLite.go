@@ -47,6 +47,7 @@ func (conn *Connection) Close() {
 	slog.Error("Error closing sqlite connection", "function", "Connection.Close", "Error", err.Error())
 }
 
+// todo add tags into schema for host defs
 func (conn *Connection) createTable() error {
 	if conn == nil {
 		return fmt.Errorf("sqlite connection is nil")
