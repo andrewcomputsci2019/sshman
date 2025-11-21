@@ -74,7 +74,7 @@ func (cfg *Config) String() string {
 	}
 	builder.WriteString("\tConflict Policy: ")
 	if cfg.StorageConf.ConflictPolicy == "" {
-		builder.WriteString(string(ConflictIgnore) + "\n")
+		builder.WriteString(string(ConflictAlwaysError) + "\n")
 	} else {
 		builder.WriteString(string(cfg.StorageConf.ConflictPolicy) + "\n")
 	}
