@@ -60,6 +60,7 @@ func (conn *Connection) createTable() error {
 		updated_at INTEGER,
 		last_connected INTEGER,
 		notes TEXT,
+		tags TEXT,
 	);
 	
 	CREATE TABLE IF NOT EXISTS host_options (
