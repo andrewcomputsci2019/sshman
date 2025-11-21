@@ -9,7 +9,6 @@ import (
 	"zombiezen.com/go/sqlite"
 )
 
-// todo add tags object
 type Host struct {
 	Host           string
 	CreatedAt      time.Time
@@ -71,6 +70,7 @@ func (h *HostOptions) String() string {
 	return fmt.Sprintf("{ID: %d, Key: %s, Value: %s}", h.ID, h.Key, h.Value)
 }
 
+// todo update insertion methods to handle nil time objects and conversion from time.Time to base 10 int64
 type HostDao struct {
 	conn *Connection
 }
