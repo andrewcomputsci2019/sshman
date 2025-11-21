@@ -25,7 +25,8 @@ func (o *optionFlags) Set(value string) error {
 func main() {
 	// log level setting
 	logLevel := flag.String("log", "None", "logging level, [Debug, Info, Warning, Error]")
-
+	// first run flag -- init
+	init := flag.Bool("init", false, "initialize sshman")
 	// quick action commands
 	quickAdd := flag.Bool("qa", false, "quick add")
 	quickDelete := flag.Bool("qd", false, "quick delete")
