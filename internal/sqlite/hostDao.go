@@ -181,6 +181,7 @@ WHERE ho.host = ?
 	return deleteBuilder.String(), args
 }
 
+// InsertMany takes in a series of host definitions and tries to upload them into the database, errors upon a conflict
 func (dao *HostDao) InsertMany(hosts ...Host) error {
 	if hosts == nil || len(hosts) <= 0 {
 		return fmt.Errorf("hosts is empty")
@@ -209,14 +210,46 @@ func (dao *HostDao) InsertMany(hosts ...Host) error {
 	return nil
 }
 
+func (dao *HostDao) InsertManyIgnoreConflict(hosts ...Host) error {
+	if hosts == nil || len(hosts) <= 0 {
+		return fmt.Errorf("hosts is empty")
+	}
+	hostInsertString := hostInsertString
+	hostOptInsertString := hostOptInsertString
+	err := dao.conn.transaction(func() error {
+		for _, host := range hosts {
+			tagsJoined := strings.Join(host.Tags, ",")
+			err := dao.conn.execute(hostInsertString, host.Host, ts(&host.CreatedAt), ts(host.UpdatedAt), ts(host.LastConnection), host.Notes, tagsJoined)
+			if sqlite.ErrCode(err) == sqlite.ResultConstraintPrimaryKey {
+				continue // ignore pkey conflict and safely continue
+			}
+			if sqlite.ErrCode(err) != sqlite.ResultOK {
+				return err
+			}
+			for _, opt := range host.Options {
+				err = dao.conn.execute(hostOptInsertString, host.Host, opt.Key, opt.Value)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// UpdateMany updates the database with a series of given host entries, errors if entries didn't exist before
 func (dao *HostDao) UpdateMany(hosts ...Host) error {
 	if hosts == nil || len(hosts) <= 0 {
 		return fmt.Errorf("hosts is empty")
 	}
 	err := dao.conn.transaction(func() error {
+		hostUpdateString := hostUpdateString
+		hostOptUpdateString := hostOptUpdateString
 		for _, host := range hosts {
-			hostUpdateString := hostUpdateString
-			hostOptUpdateString := hostOptUpdateString
 			deleteOptString, args := generateDeleteStringOpts(&host)
 			tagsJoined := strings.Join(host.Tags, ",")
 			err := dao.conn.execute(hostUpdateString, ts(&host.CreatedAt), ts(host.UpdatedAt), ts(host.LastConnection), host.Notes, tagsJoined, host.Host)
@@ -270,6 +303,8 @@ func (dao *HostDao) InsertOrUpdate(host Host) error {
 	return nil
 }
 
+// InsertOrUpdateMany is like insertMany but works under the conflict resolution model of always favor config file
+// replaces host options with the newly given one, works on the always favor config conflict resolution model
 func (dao *HostDao) InsertOrUpdateMany(hosts ...Host) error {
 	err := dao.conn.transaction(func() error {
 		hostUpSertString := hostUpSert
