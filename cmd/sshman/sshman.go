@@ -4,6 +4,7 @@ import (
 	"andrew/sshman/internal/buildInfo"
 	"andrew/sshman/internal/config"
 	"andrew/sshman/internal/flags"
+	"andrew/sshman/internal/utils"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -85,6 +86,16 @@ func main() {
 		fmt.Printf("ssh-man:\n\tversion: %v\n\tbuild date: %v\n\tbuild os: %v\n\tbuild architecture: %v\n",
 			fmt.Sprintf("%v.%v.%v", buildInfo.BuildMajor, buildInfo.BuildMinor, buildInfo.BuildPatch),
 			buildInfo.BuildDate, buildInfo.BUILD_OS, buildInfo.BUILD_ARC)
+		os.Exit(0)
+	}
+
+	if *init {
+		// run init procedure then exit
+		err := utils.InitProjectStructure()
+		if err != nil {
+			slog.Error("Failed to initialize project structure", "error", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
