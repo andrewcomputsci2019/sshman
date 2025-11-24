@@ -4,12 +4,17 @@ import (
 	"andrew/sshman/internal/buildInfo"
 	"andrew/sshman/internal/config"
 	"andrew/sshman/internal/flags"
+	"andrew/sshman/internal/sqlite"
+	"andrew/sshman/internal/sshParser"
 	"andrew/sshman/internal/utils"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"strings"
+
+	"github.com/adrg/xdg"
 )
 
 type optionFlags []string
@@ -119,6 +124,26 @@ func main() {
 	/*
 		LoadDatabase here
 	*/
+	var dbAO *sqlite.HostDao // get database access object
+	if cfg.StorageConf.StoragePath != "" {
+		conn, err := sqlite.CreateAndLoadDB(cfg.StorageConf.StoragePath)
+		if err != nil {
+			slog.Error("Error loading storage", "error", err, "path", cfg.StorageConf.StoragePath)
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to load storage file, please verify path is valid %s", cfg.StorageConf.StoragePath)
+			os.Exit(1)
+		}
+		dbAO = sqlite.NewHostDao(conn)
+	} else {
+		// use default path
+		storagePath := path.Join(xdg.DataHome, config.DefaultAppStorePath, config.DatabaseDir)
+		conn, err := sqlite.CreateAndLoadDB(storagePath)
+		if err != nil {
+			slog.Error("Error loading storage", "error", err, "path", storagePath)
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to load storage file, please verify user has permission to access %s", storagePath)
+			os.Exit(1)
+		}
+		dbAO = sqlite.NewHostDao(conn)
+	}
 
 	/*
 		QUICK ACTION PARSING
@@ -143,11 +168,71 @@ func main() {
 	}
 
 	if *quickSync {
-		_ = sshConfigFile
+		if !sshConfigFile.SetByUser {
+			_, _ = fmt.Fprintf(os.Stderr, "You must speficy a config file to sync against if using quickSync\n")
+			os.Exit(1)
+		}
+		filePath := sshConfigFile.String()
 		if forceSync != nil && *forceSync {
 
 		}
 		// check checksum and see if file has already been checked against
+		isSame, err := sshParser.IsSame(filePath)
+		if err != nil {
+			slog.Error("Error getting checksum of config file", "error", err)
+			_, _ = fmt.Fprintf(os.Stderr, "Verfiy config file exist and is readable by current login user\nFile given: %s\nerr: %v", filePath, err)
+			os.Exit(1)
+		}
+
+		if isSame {
+			slog.Info("Config file already has been synced before, skipping")
+			os.Exit(0)
+		}
+
+		hostsFromConfig, err := sshParser.ReadConfig(filePath) // get host defs from config
+		if err != nil {
+			slog.Error("Error reading config file", "error", err)
+			os.Exit(1)
+		}
+
+		conflictPolicy := cfg.StorageConf.ConflictPolicy
+		switch conflictPolicy {
+		case string(config.ConflictAlwaysError):
+			err := dbAO.InsertMany(hostsFromConfig...)
+			if err != nil {
+				slog.Error("failed to sync host into database", "error", err)
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database, please see error %v.\n", err)
+				os.Exit(1)
+			}
+		case string(config.ConflictIgnore):
+			err := dbAO.InsertManyIgnoreConflict(hostsFromConfig...)
+			if err != nil {
+				slog.Error("failed to sync host into database due to internal error", "error", err)
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database due to internal error, please see error and try again: %v.\n", err)
+				os.Exit(1)
+			}
+		case string(config.ConflictFavorConfig):
+			// upsert hosts into database
+			err := dbAO.InsertOrUpdateMany(hostsFromConfig...)
+			if err != nil {
+				slog.Error("failed to sync host into database", "error", err)
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database, please see error %v.\n", err)
+				os.Exit(1)
+			}
+		default:
+			err := dbAO.InsertMany(hostsFromConfig...)
+			if err != nil {
+				slog.Error("failed to sync host into database", "error", err)
+				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database, please see error %v.\n", err)
+				os.Exit(1)
+			}
+		}
+		err = sshParser.DumpCheckSum(filePath)
+		if err != nil {
+			slog.Error("Failed to dump checksum of config file", "error", err)
+			_, _ = fmt.Fprintf(os.Stderr, "Sync finished but errored when dumping checksum of given config file")
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
