@@ -2,6 +2,7 @@ package config
 
 import (
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,13 @@ const (
 	ED25519 = "ED25519"
 )
 
+type NamedDirectories string
+
+const (
+	KeyStoreDir = "keystore"
+	DatabaseDir = "db"
+)
+
 var KeyGenTypeSet = map[string]struct{}{
 	RSA: {}, ECDSA: {}, ED25519: {},
 }
@@ -33,7 +41,7 @@ var KeyGenTypeSet = map[string]struct{}{
 type Config struct {
 	StorageConf StorageConfig `yaml:"storage_config"`
 	Ssh         SSH           `yaml:"ssh"`
-	EnablePing  bool          `yaml:"enable_ping"` // trys to ping host to see if they are connected and reports their ping
+	EnablePing  bool          `yaml:"enable_ping"` // trys to ping host to see if they are up and reports their ping
 }
 
 type StorageConfig struct {
@@ -61,7 +69,7 @@ func (cfg *Config) String() string {
 	builder.WriteString("\tStorage Path: ")
 	if cfg.StorageConf.StoragePath == "" {
 		pathBase := xdg.DataHome
-		pathBase = pathBase + DefaultAppStorePath
+		pathBase = path.Join(pathBase, DefaultAppStorePath)
 		builder.WriteString(pathBase + "\n")
 	} else {
 		builder.WriteString(cfg.StorageConf.StoragePath + "\n")
@@ -81,11 +89,11 @@ func (cfg *Config) String() string {
 	builder.WriteString("SSH:\n")
 	builder.WriteString("\tExecutable Path: ")
 	if cfg.Ssh.ExcPath == "" {
-		path, err := exec.LookPath("ssh")
+		sshPath, err := exec.LookPath("ssh")
 		if err != nil {
 			builder.WriteString("\n")
 		} else {
-			builder.WriteString(path + "\n")
+			builder.WriteString(sshPath + "\n")
 		}
 	} else {
 		builder.WriteString(cfg.Ssh.ExcPath + "\n")
@@ -95,7 +103,7 @@ func (cfg *Config) String() string {
 	builder.WriteString("\tKey Path: ")
 	if cfg.Ssh.KeyPath == "" {
 		pathBase := xdg.DataHome
-		pathBase = pathBase + DefaultAppStorePath
+		pathBase = path.Join(pathBase, DefaultAppStorePath, KeyStoreDir)
 		builder.WriteString(pathBase + "\n")
 	} else {
 		builder.WriteString(cfg.Ssh.KeyPath + "\n")

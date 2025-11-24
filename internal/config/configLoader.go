@@ -58,10 +58,17 @@ func ValidateConfig(config *Config) error {
 			fmt.Printf("expected valid storage location but given %s\n%s\n", config.StorageConf.StoragePath, string(annotation))
 			return err
 		}
-		_, err = os.Stat(config.StorageConf.StoragePath)
+		dir, err := os.Stat(config.StorageConf.StoragePath)
 		if err != nil {
 			slog.Warn("storage database does not exist, disregard on first launch or after just setting location")
+		} else {
+			if !dir.IsDir() {
+				slog.Error("storage path is not a directory", "path", config.StorageConf.StoragePath)
+				_, _ = fmt.Fprintln(os.Stderr, "storage path is not a directory, storage path should be a directory. Path:", config.StorageConf.StoragePath)
+				return err
+			}
 		}
+
 	}
 	if config.StorageConf.ConflictPolicy != "" {
 		switch config.StorageConf.ConflictPolicy {
