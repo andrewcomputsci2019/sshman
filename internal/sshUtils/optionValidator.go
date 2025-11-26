@@ -268,6 +268,10 @@ func isValidHostname(h string) bool {
 	if len(h) == 0 || len(h) > 253 {
 		return false
 	}
+	// edge case remove trailing/ending dot in hostname
+	if h[len(h)-1] == '.' {
+		h = h[:len(h)-1]
+	}
 	parts := strings.Split(h, ".") // get all parts of the hostname
 	for _, part := range parts {
 		if len(part) == 0 {
