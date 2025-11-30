@@ -48,14 +48,15 @@ func main() {
 	versionFlag := flag.Bool("version", false, "print version and exit")
 
 	// run config parameter flags
-	host := flags.NewStringSettableFlag("h", "", "hostname")
-	port := flags.NewUintSettableFlag("p", 0, "ssh port")
+	host := flags.NewStringSettableFlag("h", "", "host alias")
+	hostname := flags.NewStringSettableFlag("hostname", "", "new hostname for given host alias")
+	port := flags.NewUintSettableFlag("p", 22, "ssh port")
 	identityFile := flags.NewStringSettableFlag("i", "", "identity file")
 	sshConfigFile := flags.NewStringSettableFlag("f", "", "ssh config file")
 	forceSync := flag.Bool("fs", false, "force sync, ignores checksum and attempts to sync database with provided config file")
 
-	var optionFlags optionFlags
-	flag.Var(&optionFlags, "o",
+	var sshConfigOptions optionFlags
+	flag.Var(&sshConfigOptions, "o",
 		"option flags, these are ssh options that you want passed, works for quick commands such as qe, and qa, in tui, "+
 			"these are passed when invoking ssh, these should be passed identically to how they are written in a config file")
 	flag.Parse()
@@ -238,6 +239,20 @@ func main() {
 
 	if *quickEdit {
 		// handle quick edit here
+		if !host.SetByUser {
+			_, _ = fmt.Fprintf(os.Stderr, "You must set host when using quick Edit\n")
+		}
+		// check for host existence in database
+		dbHost, err := dbAO.Get(host.Value)
+		if err != nil {
+			slog.Error("Error getting host", "error", err)
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to get host, please verify host is valid\n")
+		}
+		//convert hostOpts to a map of host-ops, note its a list due to a couple of options that can muti values
+		optMap := make(map[string][]sqlite.HostOptions)
+		if hostname.SetByUser {
+
+		}
 
 		os.Exit(0)
 	}
