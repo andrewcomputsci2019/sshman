@@ -298,7 +298,7 @@ func isValidHostname(h string) bool {
 	return true
 }
 
-func validHost(h string) bool {
+func ValidHost(h string) bool {
 	return isValidHostIP(h) || isValidHostname(h)
 }
 
@@ -310,9 +310,9 @@ func isLocalForwardValid(localForward string) bool {
 		return false
 	}
 	if len(parts) == 3 { //short for ie port:host:port
-		return isValidPort(parts[0]) && validHost(parts[1]) && isValidPort(parts[2])
+		return isValidPort(parts[0]) && ValidHost(parts[1]) && isValidPort(parts[2])
 	} else {
-		return validHost(parts[0]) && isValidPort(parts[1]) && validHost(parts[2]) && isValidPort(parts[3])
+		return ValidHost(parts[0]) && isValidPort(parts[1]) && ValidHost(parts[2]) && isValidPort(parts[3])
 	}
 }
 
@@ -322,9 +322,9 @@ func isRemoteForwardValid(remoteForward string) bool {
 		return false
 	}
 	if len(parts) == 3 { //short for ie port:host:port
-		return isValidPort(parts[0]) && validHost(parts[1]) && isValidPort(parts[2])
+		return isValidPort(parts[0]) && ValidHost(parts[1]) && isValidPort(parts[2])
 	} else {
-		return validHost(parts[0]) && isValidPort(parts[1]) && validHost(parts[2]) && isValidPort(parts[3])
+		return ValidHost(parts[0]) && isValidPort(parts[1]) && ValidHost(parts[2]) && isValidPort(parts[3])
 	}
 }
 
@@ -334,7 +334,7 @@ func isDynamicForwardValid(dynamicForward string) bool {
 		return false
 	}
 	if len(parts) == 1 {
-		return validHost(parts[0]) && isValidPort(parts[1])
+		return ValidHost(parts[0]) && isValidPort(parts[1])
 	} else {
 		return isValidPort(parts[0])
 	}
