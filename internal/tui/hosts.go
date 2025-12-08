@@ -6,30 +6,33 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type TableKeyBinds struct {
-	Up     key.Binding
-	Down   key.Binding
-	Left   key.Binding
-	Right  key.Binding
-	Edit   key.Binding
-	Add    key.Binding
-	Delete key.Binding
-	Select key.Binding
+	Up        key.Binding
+	Down      key.Binding
+	Left      key.Binding
+	Right     key.Binding
+	Edit      key.Binding
+	Add       key.Binding
+	Delete    key.Binding
+	Select    key.Binding
+	CycleView key.Binding
 }
 
 func (t TableKeyBinds) ShortHelp() []key.Binding {
-	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete}
+	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete, t.Select, t.CycleView}
 }
 
 func (t TableKeyBinds) FullHelp() [][]key.Binding {
 	binds := make([][]key.Binding, 0)
 	binds = append(binds, []key.Binding{t.Up, t.Down, t.Left, t.Right})
 	binds = append(binds, []key.Binding{t.Edit, t.Add, t.Delete})
+	binds = append(binds, []key.Binding{t.Select, t.CycleView})
 	return binds
 }
 
@@ -38,7 +41,7 @@ type InfoViewKeyBinds struct {
 	Down           key.Binding // k
 	Next           key.Binding // tab
 	Prev           key.Binding // shift tab
-	CollapseToggle key.Binding // ctrl-c
+	CollapseToggle key.Binding // alt-c
 	Save           key.Binding // ctrl-s only works in edit mode
 	ChangeView     key.Binding // ctrl-w
 	CancelView     key.Binding // this is like exit and go back to table focus
@@ -81,6 +84,9 @@ var tableKeyMap TableKeyBinds = TableKeyBinds{
 		key.WithHelp("d", "delete")),
 	Select: key.NewBinding(key.WithKeys("enter"),
 		key.WithHelp("enter", "connect to host")),
+	CycleView: key.NewBinding(
+		key.WithKeys("ctrl+w"),
+		key.WithHelp("ctrl+w", "cycle views")),
 }
 
 var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
@@ -103,8 +109,8 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 		key.WithKeys("ctrl+s"),
 		key.WithHelp("ctrl+s", "save")),
 	ChangeView: key.NewBinding(
-		key.WithKeys("ctrl+w"),
-		key.WithHelp("ctrl+w", "change focus view")),
+		key.WithKeys("alt+w"),
+		key.WithHelp("alt+w", "change focus view")),
 	CancelView: key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", "exit/cancel")),
@@ -157,6 +163,7 @@ type HostsInfoModel struct {
 	optionsScrollPane       viewport.Model
 	host                    string
 	previewOptionScrollPane viewport.Model
+	hostNotes               textarea.Model
 	currentEditHost         *sqlite.Host
 	HostPreviewString       string
 	width, height           int
