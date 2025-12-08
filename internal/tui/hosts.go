@@ -164,7 +164,7 @@ type HostsInfoModel struct {
 	host                    string
 	previewOptionScrollPane viewport.Model
 	hostNotes               textarea.Model
-	currentEditHost         *sqlite.Host
+	currentEditHost         sqlite.Host
 	HostPreviewString       string
 	width, height           int
 }
