@@ -5,11 +5,11 @@ import (
 	"andrew/sshman/internal/sqlite"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/evertras/bubble-table/table"
 )
 
 type TableKeyBinds struct {
@@ -109,8 +109,8 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 		key.WithKeys("ctrl+s"),
 		key.WithHelp("ctrl+s", "save")),
 	ChangeView: key.NewBinding(
-		key.WithKeys("alt+w"),
-		key.WithHelp("alt+w", "change focus view")),
+		key.WithKeys("ctrl+w"),
+		key.WithHelp("ctrl+w", "change focus view")),
 	CancelView: key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", "exit/cancel")),
@@ -227,7 +227,7 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		if msg.Width < 80 { // go into vertical render mode
+		if msg.Width < 80 { // go into vertical stack render mode
 
 		} else {
 
