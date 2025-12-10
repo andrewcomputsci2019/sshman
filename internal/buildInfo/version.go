@@ -1,5 +1,7 @@
 package buildInfo
 
+const ProgramName = "sshman"
+
 // BuildMajor major build version
 const BuildMajor = 0
 
