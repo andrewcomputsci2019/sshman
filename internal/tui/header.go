@@ -5,8 +5,24 @@ import (
 )
 
 type HeaderModel struct {
-	BuildInfo string
-	height    int
+	BuildInfo     string
+	height, width int
+	numberOfHost  uint
+	buildVersion  string
+	buildDate     string
+	buildArch     string
+	programName   string
+}
+
+func NewHeaderModel(numberOfHost uint, buildVersion, buildDate, buildArch, programName string) HeaderModel {
+	return HeaderModel{
+		height:       1,
+		numberOfHost: numberOfHost,
+		buildVersion: buildVersion,
+		buildDate:    buildDate,
+		buildArch:    buildArch,
+		programName:  programName,
+	}
 }
 
 func (h HeaderModel) Init() tea.Cmd {
@@ -15,15 +31,22 @@ func (h HeaderModel) Init() tea.Cmd {
 }
 
 func (h HeaderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	//TODO implement me
-	panic("implement me")
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		h.width = msg.Width
+	}
+	return h, nil
 }
 
 func (h HeaderModel) View() string {
-	//TODO implement me
+	//TODO implement me, render build info, program name, total host, etc
 	panic("implement me")
 }
 
 func (h HeaderModel) Height() int {
 	return h.height
+}
+
+func (h HeaderModel) Width() int {
+	return h.width
 }
