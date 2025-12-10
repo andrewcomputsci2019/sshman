@@ -84,7 +84,7 @@ func (k kvRowInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return k, nil
 		}
-		if (msg.String() == "alt+tab" || msg.Type == tea.KeyLeft) && k.mode == formNavigateMode {
+		if (msg.Type == tea.KeyShiftTab || msg.Type == tea.KeyLeft) && k.mode == formNavigateMode {
 			if k.inputFocus == 1 {
 				k.inputFocus = 0
 			}
@@ -170,7 +170,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if w.selectedRow == len(w.hostOptions)+2 && msg.String() == "enter" {
+		if w.selectedRow == len(w.hostOptions)+3 && msg.String() == "enter" {
 			// todo this is what confirms the form
 			return w, nil
 		}
@@ -181,7 +181,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			w.selectedRow++
 			return w, nil
 		}
-		if msg.String() == "up" || msg.String() == "j" || msg.String() == "alt+tab" {
+		if msg.String() == "up" || msg.String() == "j" || msg.Type == tea.KeyShiftTab {
 			if w.selectedRow == 0 {
 				return w, nil
 			}
@@ -203,6 +203,15 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if index == len(w.hostOptions)-1 {
 				w.hostOptions = append(w.hostOptions, kvRowInput{}) // as a user adds entries we
 				// want to keep adding options so they can continue to add more
+			}
+			if index < len(w.hostOptions) {
+				w.hostOptions[index].focus = true
+				return w, nil
+			}
+			if index == len(w.hostOptions) {
+				// this is the text area and it needs focus
+				cmd := w.notes.Focus()
+				return w, cmd
 			}
 		}
 		if msg.String() == "d" {
@@ -238,6 +247,7 @@ func NewWizardViewModel() WizardViewModel {
 		hostInput:     textinput.New(),
 		hostnameInput: textinput.New(),
 		hostOptions:   make([]kvRowInput, 2),
+		notes:         textarea.New(),
 		selectedRow:   0,
 		mode:          formNavigateMode,
 		width:         0,
