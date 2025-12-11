@@ -269,26 +269,42 @@ func (w WizardViewModel) Init() tea.Cmd {
 }
 
 func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if w.mode != formNavigateMode || w.mode != formEditMode {
+	if w.mode != formNavigateMode && w.mode != formEditMode {
 		w.mode = formNavigateMode
+	}
+	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+		w.width = msg.Width
+		w.height = msg.Height
+		w.recalcLayout()
+		return w, nil
 	}
 	if w.mode == formEditMode {
 		if w.selectedRow < 2 {
 			if w.selectedRow == 0 {
-				if w.hostInput.Focused() {
+				if key, ok := msg.(tea.KeyMsg); ok {
+					if key.Type == tea.KeyEnter || key.Type == tea.KeyEsc {
+						w.mode = formNavigateMode
+						w.hostInput.Blur()
+						return w, nil
+					}
 					input, cmd := w.hostInput.Update(msg)
 					w.hostInput = input
 					return w, cmd
 				} else {
-					w.mode = formNavigateMode
+					return w, nil
 				}
 			} else {
-				if w.hostnameInput.Focused() {
+				if key, ok := msg.(tea.KeyMsg); ok {
+					if key.Type == tea.KeyEnter || key.Type == tea.KeyEsc {
+						w.mode = formNavigateMode
+						w.hostnameInput.Blur()
+						return w, nil
+					}
 					input, cmd := w.hostnameInput.Update(msg)
-					w.hostnameInput = input
+					w.hostInput = input
 					return w, cmd
 				} else {
-					w.mode = formNavigateMode
+					return w, nil
 				}
 			}
 		} else if w.selectedRow < len(w.hostOptions)+2 {
@@ -311,11 +327,6 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		w.width = msg.Width
-		w.height = msg.Height
-		w.recalcLayout()
-		return w, nil
 	case tea.KeyMsg:
 		if w.selectedRow == len(w.hostOptions)+3 && msg.String() == "enter" {
 			// todo this is what confirms the form
