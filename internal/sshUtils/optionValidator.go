@@ -106,7 +106,7 @@ func GetAllAddressFamily() []string {
 	return []string{"any", "inet", "inet6"}
 }
 
-func yesNoOptionValid(v string) bool {
+func YesNoOptionValid(v string) bool {
 	return v == "yes" || v == "no"
 }
 
@@ -144,11 +144,11 @@ func validSSHTime(timeString string) bool {
 	return ok
 }
 
-func isBatchModeValid(mode string) bool {
-	return yesNoOptionValid(mode)
+func IsBatchModeValid(mode string) bool {
+	return YesNoOptionValid(mode)
 }
 
-func isBindAddressValid(bindAddress string) bool {
+func IsBindAddressValid(bindAddress string) bool {
 	if bindAddress == "localhost" {
 		return true
 	}
@@ -169,7 +169,7 @@ func isBindAddressValid(bindAddress string) bool {
 	return false
 }
 
-func isBindInterfaceValid(bindInterface string) bool {
+func IsBindInterfaceValid(bindInterface string) bool {
 	machineInterface, err := net.InterfaceByName(bindInterface)
 	if err != nil {
 		return false
@@ -180,11 +180,11 @@ func isBindInterfaceValid(bindInterface string) bool {
 	return true
 }
 
-func isCompressionModeValid(mode string) bool {
-	return yesNoOptionValid(mode)
+func IsCompressionModeValid(mode string) bool {
+	return YesNoOptionValid(mode)
 }
 
-func isChannelTimeoutValid(channelTimeout string) bool {
+func IsChannelTimeoutValid(channelTimeout string) bool {
 	//timeouts as quoted from manpage is seperated by whitespace and in the form of type=interval
 	pairs := strings.Split(channelTimeout, " ")
 	for _, pair := range pairs {
@@ -199,38 +199,38 @@ func isChannelTimeoutValid(channelTimeout string) bool {
 	return true
 }
 
-func isCheckHostIPValid(checkHostIP string) bool {
-	return yesNoOptionValid(checkHostIP)
+func IsCheckHostIPValid(checkHostIP string) bool {
+	return YesNoOptionValid(checkHostIP)
 }
 
-func isConnectionAttemptsValid(connectionAttempts string) bool {
+func IsConnectionAttemptsValid(connectionAttempts string) bool {
 	_, err := strconv.Atoi(connectionAttempts)
 	return err == nil
 }
 
-func isConnectTimeoutValid(connectTimeout string) bool {
+func IsConnectTimeoutValid(connectTimeout string) bool {
 	_, err := strconv.Atoi(connectTimeout)
 	return err == nil
 }
 
-func isForwardX11Valid(forwardX11 string) bool {
-	return yesNoOptionValid(forwardX11)
+func IsForwardX11Valid(forwardX11 string) bool {
+	return YesNoOptionValid(forwardX11)
 }
 
-func isForwardX11TimeoutValid(forwardX11Timeout string) bool {
+func IsForwardX11TimeoutValid(forwardX11Timeout string) bool {
 	return validSSHTime(forwardX11Timeout)
 }
 
-func isHostKeyAliasValid(hostKeyAlias string) bool {
+func IsHostKeyAliasValid(hostKeyAlias string) bool {
 	return len(hostKeyAlias) > 0
 }
 
-func isKbdInteractiveAuthenticationValid(kbdInteractiveAuthentication string) bool {
-	return yesNoOptionValid(kbdInteractiveAuthentication)
+func IsKbdInteractiveAuthenticationValid(kbdInteractiveAuthentication string) bool {
+	return YesNoOptionValid(kbdInteractiveAuthentication)
 }
 
-func isPasswordAuthenticationValid(passwordAuthentication string) bool {
-	return yesNoOptionValid(passwordAuthentication)
+func IsPasswordAuthenticationValid(passwordAuthentication string) bool {
+	return YesNoOptionValid(passwordAuthentication)
 }
 
 // splitForwardSpec splits a forwarding spec supports ipv6 host blocks.
@@ -264,7 +264,7 @@ func splitForwardSpec(s string) []string {
 	return parts
 }
 
-func isValidPort(port string) bool {
+func IsValidPort(port string) bool {
 	n, err := strconv.Atoi(port)
 	if err != nil {
 		return false
@@ -272,7 +272,7 @@ func isValidPort(port string) bool {
 	return n > 0 && n <= 65535
 }
 
-func isValidHostIP(h string) bool {
+func IsValidHostIP(h string) bool {
 	if strings.HasPrefix(h, "[") && strings.HasSuffix(h, "]") {
 		ip, err := netip.ParseAddr(h[1 : len(h)-1])
 		if err != nil {
@@ -290,7 +290,7 @@ func isValidHostIP(h string) bool {
 	return false
 }
 
-func isValidHostname(h string) bool {
+func IsValidHostname(h string) bool {
 	// total host length has to be less than 254 chars
 	if len(h) == 0 || len(h) > 253 {
 		return false
@@ -326,10 +326,10 @@ func isValidHostname(h string) bool {
 }
 
 func ValidHost(h string) bool {
-	return isValidHostIP(h) || isValidHostname(h)
+	return IsValidHostIP(h) || IsValidHostname(h)
 }
 
-func isLocalForwardValid(localForward string) bool {
+func IsLocalForwardValid(localForward string) bool {
 	// so we should either get [bindAddr]:port:[bindAddr]:port
 	// or port:bindAddr:port
 	parts := splitForwardSpec(localForward)
@@ -337,32 +337,32 @@ func isLocalForwardValid(localForward string) bool {
 		return false
 	}
 	if len(parts) == 3 { //short for ie port:host:port
-		return isValidPort(parts[0]) && ValidHost(parts[1]) && isValidPort(parts[2])
+		return IsValidPort(parts[0]) && ValidHost(parts[1]) && IsValidPort(parts[2])
 	} else {
-		return ValidHost(parts[0]) && isValidPort(parts[1]) && ValidHost(parts[2]) && isValidPort(parts[3])
+		return ValidHost(parts[0]) && IsValidPort(parts[1]) && ValidHost(parts[2]) && IsValidPort(parts[3])
 	}
 }
 
-func isRemoteForwardValid(remoteForward string) bool {
+func IsRemoteForwardValid(remoteForward string) bool {
 	parts := splitForwardSpec(remoteForward)
 	if len(parts) != 3 && len(parts) != 4 {
 		return false
 	}
 	if len(parts) == 3 { //short for ie port:host:port
-		return isValidPort(parts[0]) && ValidHost(parts[1]) && isValidPort(parts[2])
+		return IsValidPort(parts[0]) && ValidHost(parts[1]) && IsValidPort(parts[2])
 	} else {
-		return ValidHost(parts[0]) && isValidPort(parts[1]) && ValidHost(parts[2]) && isValidPort(parts[3])
+		return ValidHost(parts[0]) && IsValidPort(parts[1]) && ValidHost(parts[2]) && IsValidPort(parts[3])
 	}
 }
 
-func isDynamicForwardValid(dynamicForward string) bool {
+func IsDynamicForwardValid(dynamicForward string) bool {
 	parts := splitForwardSpec(dynamicForward)
 	if len(parts) > 1 {
 		return false
 	}
 	if len(parts) == 1 {
-		return ValidHost(parts[0]) && isValidPort(parts[1])
+		return ValidHost(parts[0]) && IsValidPort(parts[1])
 	} else {
-		return isValidPort(parts[0])
+		return IsValidPort(parts[0])
 	}
 }
