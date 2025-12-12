@@ -1,6 +1,7 @@
 package sshUtils
 
 import (
+	"errors"
 	"log/slog"
 	"maps"
 	"net"
@@ -59,6 +60,14 @@ func IsAcceptableOption(opt string) bool {
 	return ok
 }
 
+func ValidateSpecificOption(opt string) error {
+	//check if option is valid
+	if !IsAcceptableOption(opt) {
+		return errors.New("option isn't in settable list")
+	}
+	return nil
+}
+
 func OptionIsOfMutiType(opt string) bool {
 	_, ok := mutiOptTypes[opt]
 	return ok
@@ -69,8 +78,32 @@ func GetListOfAcceptableOptions() []string {
 	return slices.Sorted(maps.Keys(validOptionsToBeSet))
 }
 
-func isAddressFamilyValid(family string) bool {
+func IsOptionYesNo(opt string) bool {
+	// todo check if ssh option take result of type yes, no
+	switch opt {
+	case "BatchMode":
+		return true
+	case "CheckHostIP":
+		return true
+	case "Compression":
+		return true
+	case "ForwardX11":
+		return true
+	case "KbdInteractiveAuthentication":
+		return true
+	case "PasswordAuthentication":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsAddressFamilyValid(family string) bool {
 	return family == "any" || family == "inet" || family == "inet6"
+}
+
+func GetAllAddressFamily() []string {
+	return []string{"any", "inet", "inet6"}
 }
 
 func yesNoOptionValid(v string) bool {
@@ -172,18 +205,12 @@ func isCheckHostIPValid(checkHostIP string) bool {
 
 func isConnectionAttemptsValid(connectionAttempts string) bool {
 	_, err := strconv.Atoi(connectionAttempts)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func isConnectTimeoutValid(connectTimeout string) bool {
 	_, err := strconv.Atoi(connectTimeout)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func isForwardX11Valid(forwardX11 string) bool {
