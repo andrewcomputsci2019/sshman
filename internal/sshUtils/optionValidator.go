@@ -60,11 +60,12 @@ func IsAcceptableOption(opt string) bool {
 	return ok
 }
 
-func ValidateSpecificOption(opt string) error {
+func ValidateSpecificOption(opt, value string) error {
 	//check if option is valid
 	if !IsAcceptableOption(opt) {
 		return errors.New("option isn't in settable list")
 	}
+	// match against option name to validate value for the option
 	return nil
 }
 
