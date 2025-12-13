@@ -27,7 +27,7 @@ const (
 
 const (
 	wizardDefaultFormWidth   = 60
-	wizardMaxFormWidth       = 72
+	wizardMaxFormWidth       = 80
 	wizardMinFormWidth       = 40
 	wizardNotesHeight        = 6
 	wizardHostFieldHeight    = 2 // two single-line host inputs stacked
@@ -37,10 +37,20 @@ const (
 	wizardViewportMinHeight  = wizardViewportMinRows * kvRowHeight
 	wizardViewportMaxHeight  = wizardViewportMaxRows * kvRowHeight
 	kvRowHeight              = 3
-	kvRowSpacerWidth         = 3
+	kvRowSpacerWidth         = 0
 	kvRowHorizontalPadding   = 1
 	kvRowMinInputWidth       = 8
+	wizardIndicatorWidth     = 2
 )
+
+var selectionIndicatorStyle = lipgloss.NewStyle().Width(wizardIndicatorWidth)
+
+func selectionIndicator(selected bool) string {
+	if selected {
+		return selectionIndicatorStyle.Render("> ")
+	}
+	return selectionIndicatorStyle.Render("  ")
+}
 
 // todo implement kvRowInput Form logic
 type kvRowInput struct {
@@ -59,6 +69,11 @@ func newKVRowInput() kvRowInput {
 	val := textinput.New()
 	val.Placeholder = "Option value"
 	key.SetSuggestions(sshUtils.GetListOfAcceptableOptions())
+	key.ShowSuggestions = true
+	key.CompletionStyle = key.CompletionStyle.Foreground(lipgloss.Color("255"))
+	key.TextStyle = key.TextStyle.Foreground(lipgloss.Color("#7AA2F7")).Bold(true)
+	val.CompletionStyle = val.CompletionStyle.Foreground(lipgloss.Color("255"))
+	val.TextStyle = val.TextStyle.Foreground(lipgloss.Color("#CDD6F4"))
 	return kvRowInput{
 		key:    key,
 		val:    val,
@@ -70,11 +85,11 @@ func (k *kvRowInput) SetWidth(total int) {
 	if total <= 0 {
 		return
 	}
-	k.width = total
-	chromeWidth := 2 + (kvRowHorizontalPadding * 2) // 2 for border
-	innerWidth := max(total-chromeWidth, kvRowMinInputWidth*2+kvRowSpacerWidth)
-	keyWidth := (innerWidth - kvRowSpacerWidth) / 2
-	valWidth := innerWidth - kvRowSpacerWidth - keyWidth
+	k.width = total - 2
+	// so its - (2*2) for prompt width, -2 for border
+	innerWidth := max(total-8, kvRowMinInputWidth*2+kvRowSpacerWidth)
+	keyWidth := (innerWidth) / 2
+	valWidth := innerWidth - keyWidth
 	if keyWidth < kvRowMinInputWidth {
 		keyWidth = kvRowMinInputWidth
 	}
@@ -96,12 +111,22 @@ func (k kvRowInput) Init() tea.Cmd {
 	return nil
 }
 
+func setPromptStyleKvRowInput(input *textinput.Model, focused bool) {
+	if focused {
+		input.PromptStyle = input.PromptStyle.Foreground(lipgloss.Color("#7D56F4"))
+	} else {
+		input.PromptStyle = input.PromptStyle.Foreground(lipgloss.Color("255"))
+	}
+}
+
 func (k kvRowInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyEscape {
 			if k.mode == formNavigateMode {
 				k.focus = false
+				setPromptStyleKvRowInput(&k.key, false)
+				setPromptStyleKvRowInput(&k.val, false)
 				return k, nil
 			} else {
 				k.mode = formNavigateMode
@@ -123,11 +148,13 @@ func (k kvRowInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if sshUtils.IsAcceptableOption(k.key.Value()) {
 						if sshUtils.IsOptionYesNo(k.key.Value()) {
 							k.val.SetSuggestions([]string{"yes", "no"})
+							k.val.ShowSuggestions = true
 						} else if k.key.Value() == "AddressFamily" {
 							k.val.SetSuggestions(sshUtils.GetAllAddressFamily())
 						}
 					}
 				} else {
+					k.val.ShowSuggestions = false
 					k.val.Blur()
 				}
 				return k, nil
@@ -144,12 +171,16 @@ func (k kvRowInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if (msg.Type == tea.KeyTab || msg.Type == tea.KeyRight) && k.mode == formNavigateMode {
 			if k.inputFocus == keyInputFocusState {
 				k.inputFocus = valueInputFocusState
+				setPromptStyleKvRowInput(&k.key, false)
+				setPromptStyleKvRowInput(&k.val, true)
 			}
 			return k, nil
 		}
 		if (msg.Type == tea.KeyShiftTab || msg.Type == tea.KeyLeft) && k.mode == formNavigateMode {
 			if k.inputFocus == valueInputFocusState {
 				k.inputFocus = keyInputFocusState
+				setPromptStyleKvRowInput(&k.key, true)
+				setPromptStyleKvRowInput(&k.val, false)
 			}
 			return k, nil
 		}
@@ -173,10 +204,9 @@ func (k kvRowInput) View() string {
 	keyView := k.key.View()
 	valView := k.val.View()
 
-	spacer := lipgloss.NewStyle().Width(kvRowSpacerWidth).Render(" ")
-	content := lipgloss.JoinHorizontal(lipgloss.Left, keyView, spacer, valView)
+	content := lipgloss.JoinHorizontal(lipgloss.Left, keyView, valView)
 
-	borderColor := lipgloss.Color("#5A5A5A")
+	borderColor := lipgloss.Color("255")
 	if k.focus {
 		borderColor = lipgloss.Color("#7D56F4")
 	}
@@ -184,7 +214,8 @@ func (k kvRowInput) View() string {
 	rowStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(borderColor).
-		Padding(0, 1)
+		Padding(0).
+		Margin(0)
 
 	if k.width > 0 {
 		rowStyle = rowStyle.Width(k.width)
@@ -205,6 +236,18 @@ type WizardViewModel struct {
 	width, height int
 }
 
+func (w WizardViewModel) innerWidth() int {
+	width := w.formWidth
+	if width == 0 {
+		width = wizardDefaultFormWidth
+	}
+	width -= wizardIndicatorWidth
+	if width < 1 {
+		width = 1
+	}
+	return width
+}
+
 func (w *WizardViewModel) recalcLayout() {
 	formWidth := w.width
 	if formWidth == 0 {
@@ -217,14 +260,15 @@ func (w *WizardViewModel) recalcLayout() {
 		formWidth = wizardMinFormWidth
 	}
 	w.formWidth = formWidth
+	contentWidth := w.innerWidth()
 
-	w.hostInput.Width = formWidth
-	w.hostnameInput.Width = formWidth
-	w.notes.SetWidth(formWidth)
+	w.hostInput.Width = contentWidth
+	w.hostnameInput.Width = contentWidth
+	w.notes.SetWidth(contentWidth)
 	w.notes.SetHeight(wizardNotesHeight)
 
 	for i := range w.hostOptions {
-		w.hostOptions[i].SetWidth(formWidth)
+		w.hostOptions[i].SetWidth(contentWidth)
 	}
 
 	w.kvViewport.Width = formWidth
@@ -308,7 +352,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return w, nil
 					}
 					input, cmd := w.hostnameInput.Update(msg)
-					w.hostInput = input
+					w.hostnameInput = input
 					return w, cmd
 				} else {
 					return w, nil
@@ -325,6 +369,12 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			if w.selectedRow == len(w.hostOptions)+2 && w.notes.Focused() {
+				if msg, ok := msg.(tea.KeyMsg); ok {
+					if msg.Type == tea.KeyEsc || msg.Type == tea.KeyCtrlS {
+						w.notes.Blur()
+						return w, nil
+					}
+				}
 				notes, cmd := w.notes.Update(msg)
 				w.notes = notes
 				return w, cmd
@@ -377,7 +427,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return w, nil
 		}
 		if msg.String() == "down" || msg.String() == "k" || msg.String() == "tab" {
-			if w.selectedRow == len(w.hostOptions)+2 {
+			if w.selectedRow == len(w.hostOptions)+3 {
 				return w, nil
 			}
 			w.selectedRow++
@@ -406,12 +456,13 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			index := w.selectedRow - 2
 			if index == len(w.hostOptions)-1 {
 				newRow := newKVRowInput()
-				newRow.SetWidth(w.formWidth)
+				newRow.SetWidth(w.innerWidth())
 				w.hostOptions = append(w.hostOptions, newRow) // as a user adds entries we
 				// want to keep adding options so they can continue to add more
 			}
 			if index < len(w.hostOptions) {
 				w.hostOptions[index].focus = true
+				setPromptStyleKvRowInput(&w.hostOptions[index].key, true)
 				return w, nil
 			}
 			if index == len(w.hostOptions) {
@@ -422,7 +473,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.String() == "d" {
 			index := w.selectedRow - 2
-			if index > 2 && index < len(w.hostOptions) {
+			if index > 0 && index < len(w.hostOptions) {
 				// delete that option
 				if len(w.hostOptions) > 1 {
 					w.hostOptions = slices.Delete(w.hostOptions, index, index+1)
@@ -431,7 +482,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				} else { // clear the option if 2 or less rows exist
 					w.hostOptions[index] = newKVRowInput()
-					w.hostOptions[index].SetWidth(w.formWidth)
+					w.hostOptions[index].SetWidth(w.innerWidth())
 				}
 				w.ensureKVSelectionVisible()
 				return w, nil
@@ -444,30 +495,52 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (w WizardViewModel) View() string {
-	formWidth := w.formWidth
-	if formWidth == 0 {
-		formWidth = wizardDefaultFormWidth
-	}
+	contentWidth := w.innerWidth()
 
 	rowViews := make([]string, len(w.hostOptions))
 	for i := range w.hostOptions {
-		rowViews[i] = w.hostOptions[i].View()
+		row := w.hostOptions[i].View()
+		rowViews[i] = lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			selectionIndicator(w.selectedRow == i+2),
+			row,
+		)
 	}
 
 	if len(rowViews) == 0 {
-		rowViews = append(rowViews, "")
+		rowViews = append(rowViews, lipgloss.JoinHorizontal(lipgloss.Left, selectionIndicator(false), ""))
 	}
 
 	w.kvViewport.SetContent(strings.Join(rowViews, "\n"))
 	w.ensureKVSelectionVisible()
 
-	formStyle := lipgloss.NewStyle().Width(formWidth).Align(lipgloss.Left)
-	host := formStyle.Render(w.hostInput.View())
-	hostname := formStyle.Render(w.hostnameInput.View())
-	notes := formStyle.Render(w.notes.View())
+	formStyle := lipgloss.NewStyle().Width(contentWidth).Align(lipgloss.Left)
+	host := lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		selectionIndicator(w.selectedRow == 0),
+		formStyle.Render(w.hostInput.View()),
+	)
+	hostname := lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		selectionIndicator(w.selectedRow == 1),
+		formStyle.Render(w.hostnameInput.View()),
+	)
+
+	notesView := w.notes.View()
+	if w.selectedRow == len(w.hostOptions)+2 {
+		notesView = lipgloss.NewStyle().
+			Background(lipgloss.Color("#2F2F6B")).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Render(notesView)
+	}
+	notes := lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		selectionIndicator(w.selectedRow == len(w.hostOptions)+2),
+		formStyle.Render(notesView),
+	)
 
 	confirmStyle := lipgloss.NewStyle().
-		Width(w.formWidth).
+		Width(contentWidth).
 		Align(lipgloss.Center).
 		Padding(0, 1).
 		Foreground(lipgloss.Color("#E4E4E7")).
@@ -483,6 +556,11 @@ func (w WizardViewModel) View() string {
 	} else {
 		confirm = confirmStyle.Render("Confirm")
 	}
+	confirm = lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		selectionIndicator(w.selectedRow == len(w.hostOptions)+3),
+		confirm,
+	)
 
 	form := []string{host, hostname, w.kvViewport.View(), notes, confirm}
 	return lipgloss.JoinVertical(lipgloss.Left, form...)
@@ -494,7 +572,7 @@ func NewWizardViewModel() WizardViewModel {
 	hostInput.Placeholder = "alias"
 
 	hostnameInput := textinput.New()
-	hostnameInput.Prompt = "Hostname option "
+	hostnameInput.Prompt = "Hostname "
 	hostnameInput.Placeholder = "example.com"
 	hostnameInput.Validate = hostValidatorWrapper
 
@@ -509,7 +587,7 @@ func NewWizardViewModel() WizardViewModel {
 
 	formWidth := wizardDefaultFormWidth
 	defaultHeight := wizardHostFieldHeight + wizardConfirmationHeight + wizardNotesHeight + wizardViewportMinHeight
-
+	kvViewPort := viewport.New(formWidth, wizardViewportMinHeight)
 	wiz := WizardViewModel{
 		hostInput:     hostInput,
 		hostnameInput: hostnameInput,
@@ -517,7 +595,7 @@ func NewWizardViewModel() WizardViewModel {
 		notes:         notes,
 		selectedRow:   0,
 		mode:          formNavigateMode,
-		kvViewport:    viewport.New(formWidth, wizardViewportMinHeight),
+		kvViewport:    kvViewPort,
 		formWidth:     formWidth,
 		width:         formWidth,
 		height:        defaultHeight,
