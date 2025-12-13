@@ -27,7 +27,7 @@ const (
 
 const (
 	wizardDefaultFormWidth   = 60
-	wizardMaxFormWidth       = 80
+	wizardMaxFormWidth       = 100
 	wizardMinFormWidth       = 40
 	wizardNotesHeight        = 6
 	wizardHostFieldHeight    = 2 // two single-line host inputs stacked
