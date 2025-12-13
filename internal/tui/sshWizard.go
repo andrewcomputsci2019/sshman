@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"andrew/sshman/internal/sqlite"
 	"andrew/sshman/internal/sshUtils"
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -56,6 +58,7 @@ func newKVRowInput() kvRowInput {
 	key.Placeholder = "Option key"
 	val := textinput.New()
 	val.Placeholder = "Option value"
+	key.SetSuggestions(sshUtils.GetListOfAcceptableOptions())
 	return kvRowInput{
 		key:    key,
 		val:    val,
@@ -69,10 +72,7 @@ func (k *kvRowInput) SetWidth(total int) {
 	}
 	k.width = total
 	chromeWidth := 2 + (kvRowHorizontalPadding * 2) // 2 for border
-	innerWidth := total - chromeWidth
-	if innerWidth < kvRowMinInputWidth*2+kvRowSpacerWidth {
-		innerWidth = kvRowMinInputWidth*2 + kvRowSpacerWidth
-	}
+	innerWidth := max(total-chromeWidth, kvRowMinInputWidth*2+kvRowSpacerWidth)
 	keyWidth := (innerWidth - kvRowSpacerWidth) / 2
 	valWidth := innerWidth - kvRowSpacerWidth - keyWidth
 	if keyWidth < kvRowMinInputWidth {
@@ -92,6 +92,7 @@ func updateKVModel(k kvRowInput, msg tea.Msg) (kvRowInput, tea.Cmd) {
 }
 
 func (k kvRowInput) Init() tea.Cmd {
+	// no-op
 	return nil
 }
 
@@ -115,11 +116,17 @@ func (k kvRowInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if msg.Type == tea.KeyEnter {
-			// handle keystroke here
 			if k.mode == formEditMode {
 				k.mode = formNavigateMode
 				if k.inputFocus == keyInputFocusState {
 					k.key.Blur()
+					if sshUtils.IsAcceptableOption(k.key.Value()) {
+						if sshUtils.IsOptionYesNo(k.key.Value()) {
+							k.val.SetSuggestions([]string{"yes", "no"})
+						} else if k.key.Value() == "AddressFamily" {
+							k.val.SetSuggestions(sshUtils.GetAllAddressFamily())
+						}
+					}
 				} else {
 					k.val.Blur()
 				}
@@ -329,7 +336,44 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if w.selectedRow == len(w.hostOptions)+3 && msg.String() == "enter" {
-			// todo this is what confirms the form
+			cmd := func() tea.Msg {
+				host := w.hostInput.Value()
+				options := make([]sqlite.HostOptions, 0)
+				options = append(options, sqlite.HostOptions{
+					ID:    0,
+					Key:   "Hostname",
+					Value: w.hostnameInput.Value(),
+					Host:  host,
+				})
+				for _, optRow := range w.hostOptions {
+					options = append(options, sqlite.HostOptions{
+						ID:    0,
+						Key:   optRow.key.Value(),
+						Value: optRow.val.Value(),
+						Host:  host,
+					})
+				}
+				return newHostsMessage{
+					host: sqlite.Host{
+						Host:           host,
+						CreatedAt:      time.Now(),
+						UpdatedAt:      nil,
+						LastConnection: nil,
+						Notes:          w.notes.Value(),
+						Options:        options,
+					},
+				}
+			}
+			return w, cmd
+		}
+		if msg.Type == tea.KeyEnd {
+			w.selectedRow = len(w.hostOptions) + 3
+			w.ensureKVSelectionVisible()
+			return w, nil
+		}
+		if msg.Type == tea.KeyHome {
+			w.selectedRow = 0
+			w.ensureKVSelectionVisible()
 			return w, nil
 		}
 		if msg.String() == "down" || msg.String() == "k" || msg.String() == "tab" {
@@ -382,6 +426,9 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// delete that option
 				if len(w.hostOptions) > 1 {
 					w.hostOptions = slices.Delete(w.hostOptions, index, index+1)
+					if index == len(w.hostOptions) {
+						w.selectedRow--
+					}
 				} else { // clear the option if 2 or less rows exist
 					w.hostOptions[index] = newKVRowInput()
 					w.hostOptions[index].SetWidth(w.formWidth)
