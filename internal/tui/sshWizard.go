@@ -71,9 +71,9 @@ func newKVRowInput() kvRowInput {
 	key.SetSuggestions(sshUtils.GetListOfAcceptableOptions())
 	key.ShowSuggestions = true
 	key.CompletionStyle = key.CompletionStyle.Foreground(lipgloss.Color("255"))
-	key.TextStyle = key.TextStyle.Foreground(lipgloss.Color("#7AA2F7")).Bold(true)
+	key.TextStyle = key.TextStyle.Foreground(lipgloss.Color("#6CB6EB"))
 	val.CompletionStyle = val.CompletionStyle.Foreground(lipgloss.Color("255"))
-	val.TextStyle = val.TextStyle.Foreground(lipgloss.Color("#CDD6F4"))
+	val.TextStyle = val.TextStyle.Foreground(lipgloss.Color("#E5E7EB"))
 	return kvRowInput{
 		key:    key,
 		val:    val,
@@ -570,11 +570,13 @@ func NewWizardViewModel() WizardViewModel {
 	hostInput := textinput.New()
 	hostInput.Prompt = "Host (match rule)/alias "
 	hostInput.Placeholder = "alias"
+	hostInput.TextStyle = hostInput.TextStyle.Foreground(lipgloss.Color("#7AA2F7")).Bold(true)
 
 	hostnameInput := textinput.New()
 	hostnameInput.Prompt = "Hostname "
 	hostnameInput.Placeholder = "example.com"
 	hostnameInput.Validate = hostValidatorWrapper
+	hostnameInput.TextStyle = hostnameInput.TextStyle.Foreground(lipgloss.Color("#7AA2F7")).Bold(true)
 
 	notes := textarea.New()
 	notes.Placeholder = "Notes"
