@@ -71,18 +71,20 @@ type InfoViewKeyBinds struct {
 	Prev           key.Binding // shift tab
 	CollapseToggle key.Binding // alt-c
 	Save           key.Binding // ctrl-s only works in edit mode
+	AddOption      key.Binding // ctrl-a
+	DeleteOption   key.Binding // ctrl-d
 	ChangeView     key.Binding // ctrl-w
 	CancelView     key.Binding // this is like exit and go back to table focus
 }
 
 func (i InfoViewKeyBinds) ShortHelp() []key.Binding {
-	return []key.Binding{i.Up, i.Down, i.Next, i.Prev, i.CollapseToggle, i.Save, i.ChangeView, i.CancelView}
+	return []key.Binding{i.Up, i.Down, i.Next, i.Prev, i.CollapseToggle, i.Save, i.AddOption, i.DeleteOption, i.ChangeView, i.CancelView}
 }
 
 func (i InfoViewKeyBinds) FullHelp() [][]key.Binding {
 	binds := make([][]key.Binding, 0)
 	binds = append(binds, []key.Binding{i.Up, i.Down, i.Next, i.Prev})
-	binds = append(binds, []key.Binding{i.Save, i.CancelView})
+	binds = append(binds, []key.Binding{i.Save, i.AddOption, i.DeleteOption, i.CancelView})
 	binds = append(binds, []key.Binding{i.CollapseToggle, i.ChangeView})
 	return binds
 }
@@ -136,6 +138,12 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 	Save: key.NewBinding(
 		key.WithKeys("ctrl+s"),
 		key.WithHelp("ctrl+s", "save")),
+	AddOption: key.NewBinding(
+		key.WithKeys("ctrl+a"),
+		key.WithHelp("ctrl+a", "add option")),
+	DeleteOption: key.NewBinding(
+		key.WithKeys("ctrl+d"),
+		key.WithHelp("ctrl+d", "delete option")),
 	ChangeView: key.NewBinding(
 		key.WithKeys("ctrl+w"),
 		key.WithHelp("ctrl+w", "change focus view")),
@@ -225,11 +233,17 @@ func (h HostsModel) highlightedHost() *sqlite.Host {
 	return nil
 }
 
+const (
+	optionFieldKey = iota
+	optionFieldValue
+)
+
 type kvInputModel struct {
 	key           textinput.Model
 	val           textinput.Model
 	Editable      bool
 	neverEditable bool
+	focusedField  int
 }
 
 func newKvInputModel(key string, val string, initState bool, neverEdit bool) kvInputModel {
@@ -238,6 +252,7 @@ func newKvInputModel(key string, val string, initState bool, neverEdit bool) kvI
 		val:           textinput.New(),
 		Editable:      initState,
 		neverEditable: neverEdit,
+		focusedField:  optionFieldValue,
 	}
 	kv.key.Placeholder = "key"
 	kv.val.Placeholder = "value"
@@ -254,6 +269,27 @@ func (k *kvInputModel) setWidth(total int) {
 	valueWidth := max(12, total-keyWidth-4)
 	k.key.Width = keyWidth
 	k.val.Width = valueWidth
+}
+
+func (k *kvInputModel) focusField(field int) tea.Cmd {
+	k.focusedField = field
+	switch field {
+	case optionFieldKey:
+		k.val.Blur()
+		return k.key.Focus()
+	default:
+		k.key.Blur()
+		return k.val.Focus()
+	}
+}
+
+func (k *kvInputModel) focusCurrentField() tea.Cmd {
+	return k.focusField(k.focusedField)
+}
+
+func (k *kvInputModel) blur() {
+	k.key.Blur()
+	k.val.Blur()
 }
 
 type HostsInfoModel struct {
@@ -307,10 +343,26 @@ func (h HostsInfoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, infoPanelKeyMap.CollapseToggle):
 			h.previewCollapsed = !h.previewCollapsed
 			return h, nil
-		case key.Matches(msg, infoPanelKeyMap.Up), key.Matches(msg, infoPanelKeyMap.Prev):
+		case key.Matches(msg, infoPanelKeyMap.Up):
 			cmd := h.moveSelection(-1)
 			return h, cmd
-		case key.Matches(msg, infoPanelKeyMap.Down), key.Matches(msg, infoPanelKeyMap.Next):
+		case key.Matches(msg, infoPanelKeyMap.Down):
+			cmd := h.moveSelection(1)
+			return h, cmd
+		case key.Matches(msg, infoPanelKeyMap.Prev):
+			if h.mode == infoEditMode {
+				if handled, cmd := h.handleOptionFieldPrev(); handled {
+					return h, cmd
+				}
+			}
+			cmd := h.moveSelection(-1)
+			return h, cmd
+		case key.Matches(msg, infoPanelKeyMap.Next):
+			if h.mode == infoEditMode {
+				if handled, cmd := h.handleOptionFieldNext(); handled {
+					return h, cmd
+				}
+			}
 			cmd := h.moveSelection(1)
 			return h, cmd
 		case key.Matches(msg, infoPanelKeyMap.Save) && h.mode == infoEditMode:
@@ -323,6 +375,12 @@ func (h HostsInfoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return h, func() tea.Msg {
 				return updateHostsMessage{host: updated}
 			}
+		case key.Matches(msg, infoPanelKeyMap.AddOption) && h.mode == infoEditMode:
+			cmd := h.addHostOption()
+			return h, cmd
+		case key.Matches(msg, infoPanelKeyMap.DeleteOption) && h.mode == infoEditMode:
+			cmd := h.deleteSelectedHostOption()
+			return h, cmd
 		}
 	}
 	if !h.focused {
@@ -339,10 +397,13 @@ func (h HostsInfoModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			h.hostNotes, cmd = h.hostNotes.Update(msg)
 			return h, cmd
 		}
-		if h.selected >= 0 && h.selected < len(h.hostOptions) && !h.hostOptions[h.selected].neverEditable {
-			val := h.hostOptions[h.selected].val
+		if h.selectionIsOption() && h.optionSelectionEditable() {
 			var cmd tea.Cmd
-			h.hostOptions[h.selected].val, cmd = val.Update(msg)
+			if h.hostOptions[h.selected].focusedField == optionFieldKey {
+				h.hostOptions[h.selected].key, cmd = h.hostOptions[h.selected].key.Update(msg)
+			} else {
+				h.hostOptions[h.selected].val, cmd = h.hostOptions[h.selected].val.Update(msg)
+			}
 			return h, cmd
 		}
 	}
@@ -526,6 +587,10 @@ func (h HostsInfoModel) selectionIsTags() bool {
 	return h.selected == h.tagSelectionIndex()
 }
 
+func (h HostsInfoModel) selectionIsOption() bool {
+	return h.selected >= 0 && h.selected < len(h.hostOptions)
+}
+
 func (h HostsInfoModel) isIndexEditable(idx int) bool {
 	if idx == h.tagSelectionIndex() || idx == h.notesSelectionIndex() {
 		return true
@@ -534,6 +599,32 @@ func (h HostsInfoModel) isIndexEditable(idx int) bool {
 		return false
 	}
 	return !h.hostOptions[idx].neverEditable
+}
+
+func (h HostsInfoModel) optionSelectionEditable() bool {
+	return h.selectionIsOption() && !h.hostOptions[h.selected].neverEditable
+}
+
+func (h *HostsInfoModel) handleOptionFieldPrev() (bool, tea.Cmd) {
+	if !h.optionSelectionEditable() {
+		return false, nil
+	}
+	if h.hostOptions[h.selected].focusedField == optionFieldValue {
+		cmd := h.hostOptions[h.selected].focusField(optionFieldKey)
+		return true, cmd
+	}
+	return false, nil
+}
+
+func (h *HostsInfoModel) handleOptionFieldNext() (bool, tea.Cmd) {
+	if !h.optionSelectionEditable() {
+		return false, nil
+	}
+	if h.hostOptions[h.selected].focusedField == optionFieldKey {
+		cmd := h.hostOptions[h.selected].focusField(optionFieldValue)
+		return true, cmd
+	}
+	return false, nil
 }
 
 func (h HostsInfoModel) tagSelectionIndex() int {
@@ -558,13 +649,10 @@ func (h *HostsInfoModel) focusCurrentInput() tea.Cmd {
 	if h.selectionIsNotes() {
 		return h.hostNotes.Focus()
 	}
-	if h.selected < 0 || h.selected >= len(h.hostOptions) {
+	if !h.selectionIsOption() || !h.optionSelectionEditable() {
 		return nil
 	}
-	if h.hostOptions[h.selected].neverEditable {
-		return nil
-	}
-	return h.hostOptions[h.selected].val.Focus()
+	return h.hostOptions[h.selected].focusCurrentField()
 }
 
 func (h *HostsInfoModel) blurCurrentInput() {
@@ -576,10 +664,10 @@ func (h *HostsInfoModel) blurCurrentInput() {
 		h.hostNotes.Blur()
 		return
 	}
-	if h.selected < 0 || h.selected >= len(h.hostOptions) {
+	if !h.selectionIsOption() {
 		return
 	}
-	h.hostOptions[h.selected].val.Blur()
+	h.hostOptions[h.selected].blur()
 }
 
 func (h *HostsInfoModel) setHostOptions(host sqlite.Host) {
@@ -604,6 +692,45 @@ func (h *HostsInfoModel) setHostOptions(host sqlite.Host) {
 	h.hostOptions = options
 }
 
+func (h *HostsInfoModel) addHostOption() tea.Cmd {
+	if h.host == "" {
+		return nil
+	}
+	newOpt := newKvInputModel("", "", true, false)
+	newOpt.setWidth(max(10, h.width-2))
+	newOpt.blur()
+	newOpt.focusedField = optionFieldKey
+	h.hostOptions = append(h.hostOptions, newOpt)
+	h.selected = len(h.hostOptions) - 1
+	h.ensureSelectionVisible()
+	return h.focusCurrentInput()
+}
+
+func (h *HostsInfoModel) deleteSelectedHostOption() tea.Cmd {
+	if !h.optionSelectionEditable() {
+		return nil
+	}
+	idx := h.selected
+	h.blurCurrentInput()
+	h.hostOptions = append(h.hostOptions[:idx], h.hostOptions[idx+1:]...)
+	if len(h.hostOptions) == 0 {
+		h.selected = h.tagSelectionIndex()
+	} else if idx >= len(h.hostOptions) {
+		h.selected = len(h.hostOptions) - 1
+	}
+	if h.mode == infoEditMode && !h.isIndexEditable(h.selected) {
+		h.selected = h.firstEditableIndex()
+		if h.selected < 0 {
+			h.selected = h.tagSelectionIndex()
+		}
+	}
+	h.ensureSelectionVisible()
+	if h.mode == infoEditMode {
+		return h.focusCurrentInput()
+	}
+	return nil
+}
+
 func (h HostsInfoModel) firstEditableIndex() int {
 	for idx := range h.hostOptions {
 		if !h.hostOptions[idx].neverEditable {
@@ -619,12 +746,14 @@ func (h *HostsInfoModel) buildUpdatedHost() sqlite.Host {
 	host.Tags = parseTagsInput(h.tagsInput.Value())
 	host.Options = make([]sqlite.HostOptions, 0, len(h.hostOptions))
 	for _, opt := range h.hostOptions {
-		if strings.EqualFold(opt.key.Value(), "Host") {
+		key := strings.TrimSpace(opt.key.Value())
+		val := strings.TrimSpace(opt.val.Value())
+		if key == "" || val == "" || strings.EqualFold(key, "Host") {
 			continue
 		}
 		host.Options = append(host.Options, sqlite.HostOptions{
-			Key:   opt.key.Value(),
-			Value: opt.val.Value(),
+			Key:   key,
+			Value: val,
 			Host:  host.Host,
 		})
 	}
@@ -647,11 +776,16 @@ func (h HostsInfoModel) renderOptions() string {
 				indicator = "* "
 			}
 		}
+		keyStr := opt.key.Value()
+		valStr := opt.val.Value()
 		if h.mode == infoEditMode && h.selected == idx && !opt.neverEditable {
-			lines[idx] = fmt.Sprintf("%s%s %s", indicator, opt.key.Value(), opt.val.View())
-		} else {
-			lines[idx] = fmt.Sprintf("%s%s: %s", indicator, opt.key.Value(), opt.val.Value())
+			if opt.focusedField == optionFieldKey {
+				keyStr = opt.key.View()
+			} else {
+				valStr = opt.val.View()
+			}
 		}
+		lines[idx] = fmt.Sprintf("%s%s: %s", indicator, keyStr, valStr)
 		if opt.neverEditable {
 			lines[idx] += " (locked)"
 		}
@@ -951,11 +1085,11 @@ func buildHostPreview(host sqlite.Host) string {
 	for _, opt := range opts {
 		builder.WriteString(fmt.Sprintf("  %s %s\n", opt.Key, opt.Value))
 	}
-	if len(host.Tags) > 0 {
-		builder.WriteString("Tags: ")
-		builder.WriteString(strings.Join(host.Tags, ","))
-		builder.WriteRune('\n')
-	}
+	// if len(host.Tags) > 0 {
+	// 	builder.WriteString("Tags: ")
+	// 	builder.WriteString(strings.Join(host.Tags, ","))
+	// 	builder.WriteRune('\n')
+	// }
 	if note := strings.TrimSpace(host.Notes); note != "" {
 		builder.WriteString("# ")
 		builder.WriteString(note)
