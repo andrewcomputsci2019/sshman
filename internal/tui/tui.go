@@ -24,6 +24,8 @@ type newHostsMessage struct {
 	host sqlite.Host
 }
 
+type userAddHostMessage struct{}
+
 type AppModel struct {
 	width, height int // this constitutes the entire terminal size
 	// app components

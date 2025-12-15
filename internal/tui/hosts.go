@@ -35,7 +35,7 @@ const (
 const (
 	minimumTableWidth       = 32
 	minimumInfoWidth        = 28
-	verticalLayoutThreshold = 80
+	verticalLayoutThreshold = 120
 	defaultTableBias        = 0.65
 	defaultNotesHeight      = 5
 )
@@ -160,23 +160,23 @@ type HostsModel struct {
 
 func NewHostsModel(cfg config.Config) HostsModel {
 	columns := []table.Column{
-		table.NewColumn(hostColumnKey, "Host", 20),
-		table.NewColumn(hostHostnameColumnKey, "Hostname", 16),
-		table.NewColumn(hostLastConnectedColumnKey, "Last Connected", 18),
-		table.NewColumn(hostPingColumnKey, "Ping", 8),
-		table.NewColumn(hostStatusColumnKey, "Status", 10),
+		table.NewFlexColumn(hostColumnKey, "Host", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewColumn(hostPingColumnKey, "Ping", 6).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewColumn(hostStatusColumnKey, "Status", 8).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
 	}
 	tbl := table.New(columns).
 		WithRows([]table.Row{}).
 		WithMinimumHeight(5).
 		WithRowStyleFunc(func(input table.RowStyleFuncInput) lipgloss.Style {
 			if input.IsHighlighted {
-				return lipgloss.NewStyle().Background(lipgloss.Color("#2E2E3E"))
+				return lipgloss.NewStyle().Background(lipgloss.Color("#2E2E3E")).Align(lipgloss.Left)
 			}
 			if input.Index%2 == 0 {
-				return lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB"))
+				return lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Align(lipgloss.Left)
 			}
-			return lipgloss.NewStyle().Foreground(lipgloss.Color("#F3F4F6"))
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("#F3F4F6")).Align(lipgloss.Left)
 		})
 	return HostsModel{
 		table: tbl,
@@ -193,6 +193,7 @@ func (h HostsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		if key.Matches(msg.Type, tableKeyMap.Add) {
 			// handle add event.
+			return h, func() tea.Msg { return userAddHostMessage{} }
 		}
 	}
 	h.table, cmd = h.table.Update(msg)
@@ -888,6 +889,10 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h = h.upsertHost(msg.host)
 	}
 
+	if h.verticalLayout && h.infoPanel.mode != infoEditMode {
+		h.focus = focusTable
+	}
+
 	h.table.setFocused(h.focus == focusTable)
 	h.infoPanel.setFocus(h.focus == focusInfoPanel)
 
@@ -902,6 +907,12 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, infoCmd)
 	}
 	h.infoPanel = infoModel.(HostsInfoModel)
+
+	if h.verticalLayout && h.infoPanel.mode != infoEditMode {
+		h.focus = focusTable
+		h.table.setFocused(true)
+		h.infoPanel.setFocus(false)
+	}
 
 	if h.infoPanel.pendingSave {
 		h = h.upsertHost(h.infoPanel.currentEditHost)
@@ -920,8 +931,10 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			case key.Matches(keyMsg, tableKeyMap.CycleView):
-				h.focus = focusInfoPanel
-				h.table.setFocused(false)
+				if !(h.verticalLayout && h.infoPanel.mode != infoEditMode) {
+					h.focus = focusInfoPanel
+					h.table.setFocused(false)
+				}
 			case key.Matches(keyMsg, tableKeyMap.Select):
 				if host := h.table.highlightedHost(); host != nil {
 					cmds = append(cmds, startConnectCmd(*host))
@@ -941,15 +954,26 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (h HostsPanelModel) View() string {
-	tableView := lipgloss.NewStyle().
-		Width(h.table.width).
-		MarginRight(1).
-		Render(h.table.View())
+	tableWidth := h.table.width
+	infoWidth := h.infoPanel.width
+	if h.verticalLayout {
+		tableWidth = h.width
+		infoWidth = h.width
+	}
+	tableStyle := lipgloss.NewStyle().Width(tableWidth)
+	if !h.verticalLayout {
+		tableStyle = tableStyle.MarginRight(1)
+	}
+	h.table.setSize(tableWidth, h.table.height)
+	tableView := tableStyle.Render(h.table.View())
 	infoView := lipgloss.NewStyle().
-		Width(h.infoPanel.width).
+		Width(infoWidth).
 		Render(h.infoPanel.View())
 	if h.verticalLayout {
-		return lipgloss.JoinVertical(lipgloss.Left, tableView, infoView)
+		if h.infoPanel.mode == infoEditMode {
+			return infoView
+		}
+		return tableView
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, tableView, infoView)
 }
@@ -959,10 +983,8 @@ func (h *HostsPanelModel) applySize(width, height int) {
 	h.height = height
 	h.verticalLayout = width < verticalLayoutThreshold
 	if h.verticalLayout {
-		tableHeight := height / 2
-		infoHeight := height - tableHeight
-		h.table.setSize(width, tableHeight)
-		h.infoPanel.setSize(width, infoHeight)
+		h.table.setSize(width, height)
+		h.infoPanel.setSize(width, height)
 		return
 	}
 	tableWidth := int(float32(width) * h.tableGrowthBias)
@@ -1085,6 +1107,7 @@ func buildHostPreview(host sqlite.Host) string {
 	for _, opt := range opts {
 		builder.WriteString(fmt.Sprintf("  %s %s\n", opt.Key, opt.Value))
 	}
+	// dont include tags when constructing preview string
 	// if len(host.Tags) > 0 {
 	// 	builder.WriteString("Tags: ")
 	// 	builder.WriteString(strings.Join(host.Tags, ","))
