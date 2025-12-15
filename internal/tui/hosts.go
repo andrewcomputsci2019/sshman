@@ -160,9 +160,9 @@ type HostsModel struct {
 
 func NewHostsModel(cfg config.Config) HostsModel {
 	columns := []table.Column{
-		table.NewFlexColumn(hostColumnKey, "Host", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostColumnKey, "Host", 3).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 3).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
 		table.NewColumn(hostPingColumnKey, "Ping", 6).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
 		table.NewColumn(hostStatusColumnKey, "Status", 8).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
 	}
