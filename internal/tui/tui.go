@@ -26,6 +26,10 @@ type newHostsMessage struct {
 
 type userAddHostMessage struct{}
 
+type deleteHostMessage struct {
+	host string
+}
+
 type AppModel struct {
 	width, height int // this constitutes the entire terminal size
 	// app components

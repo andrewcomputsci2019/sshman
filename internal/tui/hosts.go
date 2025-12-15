@@ -22,6 +22,7 @@ const (
 	hostColumnKey              = "host"
 	hostHostnameColumnKey      = "hostname"
 	hostLastConnectedColumnKey = "last_connected"
+	hostTagColumnKey           = "tags"
 	hostPingColumnKey          = "ping"
 	hostStatusColumnKey        = "status"
 	hostRowPayloadKey          = "__host_payload"
@@ -160,11 +161,12 @@ type HostsModel struct {
 
 func NewHostsModel(cfg config.Config) HostsModel {
 	columns := []table.Column{
-		table.NewFlexColumn(hostColumnKey, "Host", 3).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 3).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewColumn(hostPingColumnKey, "Ping", 6).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewColumn(hostStatusColumnKey, "Status", 8).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostColumnKey, "Host", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostTagColumnKey, "Tags", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewColumn(hostPingColumnKey, "Ping", 4).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewColumn(hostStatusColumnKey, "Status", 5).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
 	}
 	tbl := table.New(columns).
 		WithRows([]table.Row{}).
@@ -194,6 +196,11 @@ func (h HostsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg.Type, tableKeyMap.Add) {
 			// handle add event.
 			return h, func() tea.Msg { return userAddHostMessage{} }
+		}
+		if key.Matches(msg.Type, tableKeyMap.Delete) {
+			// todo send delete request on current selected row
+			data := h.highlightedHost()
+			return h, func() tea.Msg { return deleteHostMessage{host: data.Host} }
 		}
 	}
 	h.table, cmd = h.table.Update(msg)
@@ -418,7 +425,16 @@ func (h HostsInfoModel) View() string {
 	title := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Host %s", h.host))
 	var sections []string
 	sections = append(sections, title)
-
+	createdAtString := h.currentEditHost.CreatedAt.Format("2006-01-02 15:04")
+	var updatedAtString string
+	if h.currentEditHost.UpdatedAt == nil {
+		updatedAtString = "never"
+	} else {
+		updatedAtString = h.currentEditHost.UpdatedAt.Format("2006-01-02 15:04")
+	}
+	createdAtStringLine := lipgloss.NewStyle().Bold(true).Render("Created At: ") + lipgloss.NewStyle().Foreground(lipgloss.Color("#4cbef3ff")).Render(createdAtString)
+	updatedAtStringLine := lipgloss.NewStyle().Bold(true).Render("Updated At: ") + lipgloss.NewStyle().Foreground(lipgloss.Color("#4cbef3ff")).Render(updatedAtString)
+	sections = append(sections, createdAtStringLine, updatedAtStringLine)
 	h.optionsScrollPane.SetContent(h.renderOptions())
 	sections = append(sections, lipgloss.NewStyle().Bold(true).Render("Options"))
 	sections = append(sections, h.optionsScrollPane.View())
@@ -456,9 +472,9 @@ func (h *HostsInfoModel) setSize(width, height int) {
 	h.width = width
 	h.height = height
 	h.optionsScrollPane.Width = width
-	h.optionsScrollPane.Height = max(4, height/2)
+	h.optionsScrollPane.Height = max(4, min(8, height/6))
 	h.previewOptionScrollPane.Width = width
-	h.previewOptionScrollPane.Height = max(3, height-h.optionsScrollPane.Height-defaultNotesHeight-2)
+	h.previewOptionScrollPane.Height = max(3, min(6, height-h.optionsScrollPane.Height-defaultNotesHeight-6))
 	h.hostNotes.SetWidth(max(10, width-2))
 	h.tagsInput.Width = max(10, width-2)
 	h.hostNotes.SetHeight(max(defaultNotesHeight, height/4))
@@ -1050,6 +1066,7 @@ func hostToRow(host *sqlite.Host, cfg config.Config) table.Row {
 	row := table.NewRow(table.RowData{
 		hostColumnKey:              host.Host,
 		hostHostnameColumnKey:      hostOptionValue(host, "Hostname"),
+		hostTagColumnKey:           strings.Join(host.Tags, ","),
 		hostLastConnectedColumnKey: formatLastConnected(host.LastConnection),
 		hostPingColumnKey:          formatPing(cfg.EnablePing),
 		hostStatusColumnKey:        formatHostStatus(cfg.EnablePing),
