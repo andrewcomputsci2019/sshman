@@ -36,7 +36,7 @@ func ReadConfig(file string) ([]sqlite.Host, error) {
 		if idx == 0 { // first values is always a host * pattern
 			continue
 		}
-		if h.Patterns == nil || len(h.Patterns) == 0 {
+		if len(h.Patterns) == 0 {
 			continue
 		}
 		// ignore these types of host patterns
