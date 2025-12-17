@@ -161,25 +161,27 @@ type HostsModel struct {
 
 func NewHostsModel(cfg config.Config) HostsModel {
 	columns := []table.Column{
-		table.NewFlexColumn(hostColumnKey, "Host", 2).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewFlexColumn(hostTagColumnKey, "Tags", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewColumn(hostPingColumnKey, "Ping", 4).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
-		table.NewColumn(hostStatusColumnKey, "Status", 5).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left)),
+		table.NewFlexColumn(hostColumnKey, "Host", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))).WithFiltered(true),
+		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))).WithFiltered(true),
+		table.NewFlexColumn(hostTagColumnKey, "Tags", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))).WithFiltered(true),
+		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))),
+		table.NewColumn(hostPingColumnKey, "Ping", 4).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))),
+		table.NewColumn(hostStatusColumnKey, "Status", 6).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))),
 	}
 	tbl := table.New(columns).
 		WithRows([]table.Row{}).
 		WithMinimumHeight(5).
 		WithRowStyleFunc(func(input table.RowStyleFuncInput) lipgloss.Style {
 			if input.IsHighlighted {
-				return lipgloss.NewStyle().Background(lipgloss.Color("#2E2E3E")).Align(lipgloss.Left)
+				return lipgloss.NewStyle().Background(lipgloss.Color("#2E2E3E")).Foreground(lipgloss.Color("#7D56F4")).Align(lipgloss.Left)
 			}
 			if input.Index%2 == 0 {
 				return lipgloss.NewStyle().Foreground(lipgloss.Color("#D1D5DB")).Align(lipgloss.Left)
 			}
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("#F3F4F6")).Align(lipgloss.Left)
-		})
+		}).
+		Filtered(true).
+		BorderRounded()
 	return HostsModel{
 		table: tbl,
 		cfg:   cfg,
@@ -192,17 +194,6 @@ func (h HostsModel) Init() tea.Cmd {
 
 func (h HostsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		if key.Matches(msg.Type, tableKeyMap.Add) {
-			// handle add event.
-			return h, func() tea.Msg { return userAddHostMessage{} }
-		}
-		if key.Matches(msg.Type, tableKeyMap.Delete) {
-			// todo send delete request on current selected row
-			data := h.highlightedHost()
-			return h, func() tea.Msg { return deleteHostMessage{host: data.Host} }
-		}
-	}
 	h.table, cmd = h.table.Update(msg)
 	return h, cmd
 }
@@ -901,8 +892,10 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h.applySize(msg.Width, msg.Height)
 	case newHostsMessage:
 		h = h.upsertHost(msg.host)
-	case updateHostsMessage:
+	case updateHostsMessage: // todo likely not needed as program already saves host update on next event
 		h = h.upsertHost(msg.host)
+	case deleteHostMessage:
+		// todo search and delete host from table
 	}
 
 	if h.verticalLayout && h.infoPanel.mode != infoEditMode {
@@ -940,7 +933,16 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if h.focus == focusTable {
 			switch {
-			case key.Matches(keyMsg, tableKeyMap.Edit):
+			case key.Matches(keyMsg, tableKeyMap.Add) && !h.table.table.GetIsFilterInputFocused():
+				return h, func() tea.Msg { return userAddHostMessage{} }
+			case key.Matches(keyMsg, tableKeyMap.Delete) && !h.table.table.GetIsFilterInputFocused():
+				data := h.table.highlightedHost()
+				if data == nil {
+					return h, nil
+				}
+				// todo remove host from row
+				return h, func() tea.Msg { return deleteHostMessage{host: data.Host} }
+			case key.Matches(keyMsg, tableKeyMap.Edit) && !h.table.table.GetIsFilterInputFocused():
 				if cmd := h.beginEditSelectedHost(); cmd != nil {
 					h.focus = focusInfoPanel
 					h.table.setFocused(false)
@@ -1003,10 +1005,7 @@ func (h *HostsPanelModel) applySize(width, height int) {
 		h.infoPanel.setSize(width, height)
 		return
 	}
-	tableWidth := int(float32(width) * h.tableGrowthBias)
-	if tableWidth < minimumTableWidth {
-		tableWidth = minimumTableWidth
-	}
+	tableWidth := max(int(float32(width)*h.tableGrowthBias), minimumTableWidth)
 	infoWidth := width - tableWidth
 	if infoWidth < minimumInfoWidth {
 		infoWidth = minimumInfoWidth
@@ -1091,6 +1090,7 @@ func formatLastConnected(ts *time.Time) string {
 	return ts.Format("2006-01-02 15:04")
 }
 
+// todo add ping ability
 func formatPing(enabled bool) string {
 	if !enabled {
 		return "disabled"
@@ -1098,11 +1098,12 @@ func formatPing(enabled bool) string {
 	return "n/a"
 }
 
+// todo add ping ability
 func formatHostStatus(pingEnabled bool) string {
 	if !pingEnabled {
 		return "unknown"
 	}
-	return "pending"
+	return "?"
 }
 
 func startConnectCmd(host sqlite.Host) tea.Cmd {
