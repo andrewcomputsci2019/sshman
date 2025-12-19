@@ -1,33 +1,41 @@
 package tui
 
 import (
+	"andrew/sshman/internal/buildInfo"
+	"strconv"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type HeaderModel struct {
-	BuildInfo     string
 	height, width int
 	numberOfHost  uint
-	buildVersion  string
+	buildMajor    int
+	buildMinor    int
+	buildPatch    int
 	buildDate     string
+	buildOS       string
 	buildArch     string
 	programName   string
 }
 
-func NewHeaderModel(numberOfHost uint, buildVersion, buildDate, buildArch, programName string) HeaderModel {
+func NewHeaderModel(numberOfHost uint) HeaderModel {
 	return HeaderModel{
 		height:       1,
 		numberOfHost: numberOfHost,
-		buildVersion: buildVersion,
-		buildDate:    buildDate,
-		buildArch:    buildArch,
-		programName:  programName,
+		buildDate:    buildInfo.BuildDate,
+		buildArch:    buildInfo.BUILD_ARC,
+		buildOS:      buildInfo.BUILD_OS,
+		buildMajor:   buildInfo.BuildMajor,
+		buildMinor:   buildInfo.BuildMinor,
+		buildPatch:   buildInfo.BuildPatch,
+		programName:  buildInfo.ProgramName,
 	}
 }
 
 func (h HeaderModel) Init() tea.Cmd {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (h HeaderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -40,7 +48,29 @@ func (h HeaderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (h HeaderModel) View() string {
 	//TODO implement me, render build info, program name, total host, etc
-	panic("implement me")
+	separator := "⏺"
+	numHostString := strconv.Itoa(int(h.numberOfHost))
+	majorStyle := lipgloss.NewStyle().Background(lipgloss.Color("#54cb25ff")).Foreground(lipgloss.Color("#000"))
+	minorVersion := lipgloss.NewStyle().Background(lipgloss.Color("#1dc4b6ff")).Foreground(lipgloss.Color("#000"))
+	patchVersion := lipgloss.NewStyle().Background(lipgloss.Color("#2c7dc4ff")).Foreground(lipgloss.Color("#000"))
+	base := lipgloss.NewStyle().Foreground(lipgloss.Color("#fff"))
+	render := lipgloss.JoinHorizontal(lipgloss.Left,
+		base.Render("🛠️\t"+h.programName+" "+separator+" "),
+		base.Render("Build: "),
+		majorStyle.Render(strconv.Itoa(h.buildMajor)+"."),
+		minorVersion.Render(strconv.Itoa(h.buildMinor)+"."),
+		patchVersion.Render(strconv.Itoa(h.buildPatch)),
+		base.Render(
+			" Build Date: "+h.buildDate+
+				" Instruction Set: "+h.buildArch+
+				" "+separator+" OS: "+h.buildOS+
+				" "+separator+" Total Hosts Managed: "+numHostString,
+		),
+	)
+	return lipgloss.NewStyle().
+		Width(h.width).
+		MaxWidth(h.width).
+		Render(render)
 }
 
 func (h HeaderModel) Height() int {
