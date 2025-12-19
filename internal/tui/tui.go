@@ -47,6 +47,11 @@ type PingResult struct {
 	Ping          uint
 }
 
+type PingReq struct {
+	Host     string
+	Hostname string
+}
+
 type AppModel struct {
 	width, height int // this constitutes the entire terminal size
 	// app components
