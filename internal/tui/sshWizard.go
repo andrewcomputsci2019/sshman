@@ -30,7 +30,7 @@ const (
 	wizardMaxFormWidth       = 100
 	wizardMinFormWidth       = 40
 	wizardNotesHeight        = 6
-	wizardHostFieldHeight    = 2 // two single-line host inputs stacked
+	wizardHostFieldHeight    = 3 // 3 single-line host inputs stacked
 	wizardConfirmationHeight = 1
 	wizardViewportMinRows    = 3
 	wizardViewportMaxRows    = 5
@@ -227,6 +227,7 @@ func (k kvRowInput) View() string {
 type WizardViewModel struct {
 	hostInput     textinput.Model
 	hostnameInput textinput.Model
+	tags          textinput.Model
 	hostOptions   []kvRowInput
 	notes         textarea.Model
 	selectedRow   int // 0 hostInput, 1 hostnameInput, 2 from []kvRowInput onwards, len(hostOptions)+2 textarea , and len(hostOptions)+3 == confirm button
@@ -264,6 +265,7 @@ func (w *WizardViewModel) recalcLayout() {
 
 	w.hostInput.Width = contentWidth
 	w.hostnameInput.Width = contentWidth
+	w.tags.Width = contentWidth
 	w.notes.SetWidth(contentWidth)
 	w.notes.SetHeight(wizardNotesHeight)
 
@@ -330,8 +332,9 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return w, nil
 	}
 	if w.mode == formEditMode {
-		if w.selectedRow < 2 {
-			if w.selectedRow == 0 {
+		if w.selectedRow < 3 {
+			switch w.selectedRow {
+			case 0:
 				if key, ok := msg.(tea.KeyMsg); ok {
 					if key.Type == tea.KeyEnter || key.Type == tea.KeyEsc {
 						w.mode = formNavigateMode
@@ -344,7 +347,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					return w, nil
 				}
-			} else {
+			case 1:
 				if key, ok := msg.(tea.KeyMsg); ok {
 					if key.Type == tea.KeyEnter || key.Type == tea.KeyEsc {
 						w.mode = formNavigateMode
@@ -357,9 +360,22 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					return w, nil
 				}
+			default:
+				if key, ok := msg.(tea.KeyMsg); ok {
+					if key.Type == tea.KeyEnter || key.Type == tea.KeyEsc {
+						w.mode = formNavigateMode
+						w.tags.Blur()
+						return w, nil
+					}
+					input, cmd := w.tags.Update(msg)
+					w.tags = input
+					return w, cmd
+				} else {
+					return w, nil
+				}
 			}
-		} else if w.selectedRow < len(w.hostOptions)+2 {
-			index := w.selectedRow - 2
+		} else if w.selectedRow < len(w.hostOptions)+3 {
+			index := w.selectedRow - 3
 			if w.hostOptions[index].focus {
 				input, cmd := updateKVModel(w.hostOptions[index], msg)
 				w.hostOptions[index] = input
@@ -368,7 +384,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w.mode = formNavigateMode
 			}
 		} else {
-			if w.selectedRow == len(w.hostOptions)+2 && w.notes.Focused() {
+			if w.selectedRow == len(w.hostOptions)+3 && w.notes.Focused() {
 				if msg, ok := msg.(tea.KeyMsg); ok {
 					if msg.Type == tea.KeyEsc || msg.Type == tea.KeyCtrlS {
 						w.notes.Blur()
@@ -388,7 +404,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type == tea.KeyEsc {
 			return w, func() tea.Msg { return userExitWizard{} }
 		}
-		if w.selectedRow == len(w.hostOptions)+3 && msg.String() == "enter" {
+		if w.selectedRow == len(w.hostOptions)+4 && msg.String() == "enter" {
 			cmd := func() tea.Msg {
 				host := w.hostInput.Value()
 				options := make([]sqlite.HostOptions, 0)
@@ -406,6 +422,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						Host:  host,
 					})
 				}
+				tags := strings.Split(w.tags.Value(), ",")
 				return newHostsMessage{
 					host: sqlite.Host{
 						Host:           host,
@@ -414,13 +431,14 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						LastConnection: nil,
 						Notes:          w.notes.Value(),
 						Options:        options,
+						Tags:           tags,
 					},
 				}
 			}
 			return w, cmd
 		}
 		if msg.Type == tea.KeyEnd {
-			w.selectedRow = len(w.hostOptions) + 3
+			w.selectedRow = len(w.hostOptions) + 4
 			w.ensureKVSelectionVisible()
 			return w, nil
 		}
@@ -430,7 +448,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return w, nil
 		}
 		if msg.String() == "down" || msg.String() == "k" || msg.String() == "tab" {
-			if w.selectedRow == len(w.hostOptions)+3 {
+			if w.selectedRow == len(w.hostOptions)+4 {
 				return w, nil
 			}
 			w.selectedRow++
@@ -448,15 +466,20 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "enter" {
 			w.mode = formEditMode
 			// get selected row and then toggle that element as focused
-			if w.selectedRow < 2 {
-				if w.selectedRow == 0 {
+			if w.selectedRow < 3 {
+				switch w.selectedRow {
+				case 0:
 					cmd := w.hostInput.Focus()
 					return w, cmd
+				case 1:
+					cmd := w.hostnameInput.Focus()
+					return w, cmd
+				default:
+					cmd := w.tags.Focus()
+					return w, cmd
 				}
-				cmd := w.hostnameInput.Focus()
-				return w, cmd
 			}
-			index := w.selectedRow - 2
+			index := w.selectedRow - 3
 			if index == len(w.hostOptions)-1 {
 				newRow := newKVRowInput()
 				newRow.SetWidth(w.innerWidth())
@@ -475,7 +498,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if msg.String() == "d" {
-			index := w.selectedRow - 2
+			index := w.selectedRow - 3
 			if index > 0 && index < len(w.hostOptions) {
 				// delete that option
 				if len(w.hostOptions) > 1 {
@@ -505,7 +528,7 @@ func (w WizardViewModel) View() string {
 		row := w.hostOptions[i].View()
 		rowViews[i] = lipgloss.JoinHorizontal(
 			lipgloss.Left,
-			selectionIndicator(w.selectedRow == i+2),
+			selectionIndicator(w.selectedRow == i+3),
 			row,
 		)
 	}
@@ -528,9 +551,12 @@ func (w WizardViewModel) View() string {
 		selectionIndicator(w.selectedRow == 1),
 		formStyle.Render(w.hostnameInput.View()),
 	)
-
+	tags := lipgloss.JoinHorizontal(lipgloss.Left,
+		selectionIndicator(w.selectedRow == 2),
+		formStyle.Render(w.tags.View()),
+	)
 	notesView := w.notes.View()
-	if w.selectedRow == len(w.hostOptions)+2 {
+	if w.selectedRow == len(w.hostOptions)+3 {
 		notesView = lipgloss.NewStyle().
 			Background(lipgloss.Color("#2F2F6B")).
 			Foreground(lipgloss.Color("#FFFFFF")).
@@ -538,7 +564,7 @@ func (w WizardViewModel) View() string {
 	}
 	notes := lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		selectionIndicator(w.selectedRow == len(w.hostOptions)+2),
+		selectionIndicator(w.selectedRow == len(w.hostOptions)+3),
 		formStyle.Render(notesView),
 	)
 
@@ -554,18 +580,18 @@ func (w WizardViewModel) View() string {
 		Background(lipgloss.Color("#3D5AFE")).
 		Bold(true)
 	var confirm string
-	if w.selectedRow == len(w.hostOptions)+3 {
+	if w.selectedRow == len(w.hostOptions)+4 {
 		confirm = confirmFocusedStyle.Render("> Confirm <")
 	} else {
 		confirm = confirmStyle.Render("Confirm")
 	}
 	confirm = lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		selectionIndicator(w.selectedRow == len(w.hostOptions)+3),
+		selectionIndicator(w.selectedRow == len(w.hostOptions)+4),
 		confirm,
 	)
 
-	form := []string{host, hostname, w.kvViewport.View(), notes, confirm}
+	form := []string{host, hostname, tags, w.kvViewport.View(), notes, confirm}
 	return lipgloss.JoinVertical(lipgloss.Left, form...)
 }
 
@@ -580,6 +606,11 @@ func NewWizardViewModel() WizardViewModel {
 	hostnameInput.Placeholder = "example.com"
 	hostnameInput.Validate = hostValidatorWrapper
 	hostnameInput.TextStyle = hostnameInput.TextStyle.Foreground(lipgloss.Color("#7AA2F7")).Bold(true)
+
+	tagsInput := textinput.New()
+	tagsInput.Prompt = "Tags "
+	tagsInput.Placeholder = "tag1,tag2"
+	tagsInput.TextStyle = hostInput.TextStyle.Foreground(lipgloss.Color("#7AA2F7")).Bold(true)
 
 	notes := textarea.New()
 	notes.Placeholder = "Notes"
@@ -596,6 +627,7 @@ func NewWizardViewModel() WizardViewModel {
 	wiz := WizardViewModel{
 		hostInput:     hostInput,
 		hostnameInput: hostnameInput,
+		tags:          tagsInput,
 		hostOptions:   hostOptions,
 		notes:         notes,
 		selectedRow:   0,
