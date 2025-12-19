@@ -50,12 +50,19 @@ func (h *Host) String() string {
 	builder.WriteString(",\n")
 	builder.WriteString("Options: [")
 	for i, opt := range h.Options {
-		if i < len(h.Options)-1 {
+		if i < len(h.Options)-1 && i > 0 {
 			builder.WriteString(",")
 		}
 		builder.WriteString(opt.String())
 	}
 	builder.WriteString("],\n")
+	builder.WriteString("Tags: [")
+	for i, tag := range h.Tags {
+		if i < len(h.Tags)-1 && i > 0 {
+			builder.WriteString(",")
+		}
+		builder.WriteString(tag)
+	}
 	return builder.String()
 }
 
