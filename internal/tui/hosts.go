@@ -50,18 +50,19 @@ type TableKeyBinds struct {
 	Add       key.Binding
 	Delete    key.Binding
 	Select    key.Binding
+	Ping      key.Binding
 	CycleView key.Binding
 }
 
 func (t TableKeyBinds) ShortHelp() []key.Binding {
-	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete, t.Select, t.CycleView}
+	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete, t.Select, t.CycleView, t.Ping}
 }
 
 func (t TableKeyBinds) FullHelp() [][]key.Binding {
 	binds := make([][]key.Binding, 0)
 	binds = append(binds, []key.Binding{t.Up, t.Down, t.Left, t.Right})
 	binds = append(binds, []key.Binding{t.Edit, t.Add, t.Delete})
-	binds = append(binds, []key.Binding{t.Select, t.CycleView})
+	binds = append(binds, []key.Binding{t.Select, t.CycleView, t.Ping})
 	return binds
 }
 
@@ -115,6 +116,10 @@ var tableKeyMap TableKeyBinds = TableKeyBinds{
 		key.WithHelp("d", "delete")),
 	Select: key.NewBinding(key.WithKeys("enter"),
 		key.WithHelp("enter", "connect to host")),
+	Ping: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "ping host"),
+	),
 	CycleView: key.NewBinding(
 		key.WithKeys("ctrl+w"),
 		key.WithHelp("ctrl+w", "cycle views")),
@@ -123,34 +128,34 @@ var tableKeyMap TableKeyBinds = TableKeyBinds{
 var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 	Up: key.NewBinding(
 		key.WithKeys("k", "up"),
-		key.WithHelp("k/↑", "up")),
+		key.WithHelp("k/↑", " up ")),
 	Down: key.NewBinding(
 		key.WithKeys("j", "down"),
-		key.WithHelp("j/↓", "down")),
+		key.WithHelp("j/↓", " down ")),
 	Next: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("tab", "next")),
+		key.WithHelp("tab", " next ")),
 	Prev: key.NewBinding(
 		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "prev")),
+		key.WithHelp("shift+tab", " prev ")),
 	CollapseToggle: key.NewBinding(
 		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "collapse")),
+		key.WithHelp("ctrl+c", " collapse ")),
 	Save: key.NewBinding(
 		key.WithKeys("ctrl+s"),
-		key.WithHelp("ctrl+s", "save")),
+		key.WithHelp("ctrl+s", " save ")),
 	AddOption: key.NewBinding(
 		key.WithKeys("ctrl+a"),
-		key.WithHelp("ctrl+a", "add option")),
+		key.WithHelp("ctrl+a", " add option ")),
 	DeleteOption: key.NewBinding(
 		key.WithKeys("ctrl+d"),
-		key.WithHelp("ctrl+d", "delete option")),
+		key.WithHelp("ctrl+d", " delete option ")),
 	ChangeView: key.NewBinding(
 		key.WithKeys("ctrl+w"),
-		key.WithHelp("ctrl+w", "change focus view")),
+		key.WithHelp("ctrl+w", " change view ")),
 	CancelView: key.NewBinding(
 		key.WithKeys("esc"),
-		key.WithHelp("esc", "exit/cancel")),
+		key.WithHelp("esc", " exit/cancel ")),
 }
 
 type HostsModel struct {
