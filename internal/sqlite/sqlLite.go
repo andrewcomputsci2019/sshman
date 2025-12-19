@@ -60,10 +60,10 @@ func (conn *Connection) createTable() error {
 		updated_at INTEGER,
 		last_connected INTEGER,
 		notes TEXT,
-		tags TEXT,
+		tags TEXT
 	);
 	
-	CREATE TABLE IF NOT EXISTS host_options (
+	CREATE TABLE IF NOT EXISTS host_options(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		host TEXT NOT NULL REFERENCES hosts(host) ON DELETE CASCADE,
 		key TEXT NOT NULL,
