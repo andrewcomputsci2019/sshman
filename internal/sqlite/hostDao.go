@@ -183,7 +183,7 @@ WHERE ho.host = ?
 
 // InsertMany takes in a series of host definitions and tries to upload them into the database, errors upon a conflict
 func (dao *HostDao) InsertMany(hosts ...Host) error {
-	if hosts == nil || len(hosts) <= 0 {
+	if len(hosts) <= 0 {
 		return fmt.Errorf("hosts is empty")
 	}
 	hostInsertString := hostInsertString
@@ -211,7 +211,7 @@ func (dao *HostDao) InsertMany(hosts ...Host) error {
 }
 
 func (dao *HostDao) InsertManyIgnoreConflict(hosts ...Host) error {
-	if hosts == nil || len(hosts) <= 0 {
+	if len(hosts) <= 0 {
 		return fmt.Errorf("hosts is empty")
 	}
 	hostInsertString := hostInsertString
@@ -243,7 +243,7 @@ func (dao *HostDao) InsertManyIgnoreConflict(hosts ...Host) error {
 
 // UpdateMany updates the database with a series of given host entries, errors if entries didn't exist before
 func (dao *HostDao) UpdateMany(hosts ...Host) error {
-	if hosts == nil || len(hosts) <= 0 {
+	if len(hosts) <= 0 {
 		return fmt.Errorf("hosts is empty")
 	}
 	err := dao.conn.transaction(func() error {
