@@ -385,6 +385,9 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if msg.Type == tea.KeyEsc {
+			return w, func() tea.Msg { return userExitWizard{} }
+		}
 		if w.selectedRow == len(w.hostOptions)+3 && msg.String() == "enter" {
 			cmd := func() tea.Msg {
 				host := w.hostInput.Value()
