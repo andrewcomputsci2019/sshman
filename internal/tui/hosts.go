@@ -899,8 +899,6 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h = h.upsertHost(msg.host)
 	case updateHostsMessage: // todo likely not needed as program already saves host update on next event
 		h = h.upsertHost(msg.host)
-	case deleteHostMessage:
-		// todo search and delete host from table
 	}
 
 	if h.verticalLayout && h.infoPanel.mode != infoEditMode {
@@ -939,14 +937,15 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if h.focus == focusTable {
 			switch {
 			case key.Matches(keyMsg, tableKeyMap.Add) && !h.table.table.GetIsFilterInputFocused():
-				return h, func() tea.Msg { return userAddHostMessage{} }
+				cmds = append(cmds, func() tea.Msg { return userAddHostMessage{} })
 			case key.Matches(keyMsg, tableKeyMap.Delete) && !h.table.table.GetIsFilterInputFocused():
 				data := h.table.highlightedHost()
 				if data == nil {
-					return h, nil
+					break
 				}
 				// todo remove host from row
-				return h, func() tea.Msg { return deleteHostMessage{host: data.Host} }
+				cmd := func() tea.Msg { return deleteHostMessage{host: data.Host} }
+				cmds = append(cmds, cmd)
 			case key.Matches(keyMsg, tableKeyMap.Edit) && !h.table.table.GetIsFilterInputFocused():
 				if cmd := h.beginEditSelectedHost(); cmd != nil {
 					h.focus = focusInfoPanel
@@ -962,6 +961,17 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if host := h.table.highlightedHost(); host != nil {
 					cmds = append(cmds, startConnectCmd(*host))
 				}
+			case key.Matches(keyMsg, tableKeyMap.Ping) && !h.table.table.GetIsFilterInputFocused() && h.table.cfg.EnablePing:
+				host := h.table.highlightedHost()
+				if host == nil {
+					break
+				}
+				cmds = append(cmds, func() tea.Msg {
+					return PingReq{
+						Host:     host.Host,
+						Hostname: hostOptionValue(host, "Hostname"),
+					}
+				})
 			}
 		} else {
 			switch {
