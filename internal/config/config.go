@@ -102,7 +102,7 @@ func (cfg *Config) String() string {
 	builder.WriteString(strconv.FormatBool(cfg.Ssh.KeyOnly) + "\n")
 	builder.WriteString("\tKey Path: ")
 	if cfg.Ssh.KeyPath == "" {
-		pathBase := xdg.DataHome
+		pathBase := xdg.ConfigHome
 		pathBase = path.Join(pathBase, DefaultAppStorePath, KeyStoreDir)
 		builder.WriteString(pathBase + "\n")
 	} else {
@@ -120,4 +120,8 @@ func (cfg *Config) String() string {
 		}
 	}
 	return builder.String()
+}
+
+func (c Config) GetSshConfigFilePath() string {
+	return path.Join(xdg.ConfigHome, DefaultAppStorePath, "ssh/config")
 }
