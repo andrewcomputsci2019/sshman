@@ -3,6 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type FooterModel struct {
@@ -14,6 +15,7 @@ type FooterModel struct {
 func NewFooterModel() FooterModel {
 	return FooterModel{
 		height: 1,
+		h:      help.New(),
 	}
 }
 
@@ -32,6 +34,9 @@ func (f FooterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (f FooterModel) View() string {
+	f.h.Styles.ShortKey = f.h.Styles.ShortKey.Foreground(lipgloss.Color("#fff"))
+	f.h.Styles.ShortDesc = f.h.Styles.ShortDesc.Foreground(lipgloss.Color("#fff"))
+	f.h.Styles.ShortSeparator = f.h.Styles.ShortSeparator.Foreground(lipgloss.Color("#9e9e9eff"))
 	return f.h.View(f.currentKeymap)
 }
 
