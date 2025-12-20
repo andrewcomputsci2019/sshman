@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -50,7 +51,7 @@ func (h *Host) String() string {
 	builder.WriteString(",\n")
 	builder.WriteString("Options: [")
 	for i, opt := range h.Options {
-		if i < len(h.Options)-1 && i > 0 {
+		if i > 0 {
 			builder.WriteString(",")
 		}
 		builder.WriteString(opt.String())
@@ -58,11 +59,12 @@ func (h *Host) String() string {
 	builder.WriteString("],\n")
 	builder.WriteString("Tags: [")
 	for i, tag := range h.Tags {
-		if i < len(h.Tags)-1 && i > 0 {
+		if i > 0 {
 			builder.WriteString(",")
 		}
 		builder.WriteString(tag)
 	}
+	builder.WriteString("]\n}")
 	return builder.String()
 }
 
@@ -82,13 +84,13 @@ type HostDao struct {
 }
 
 const (
-	hostInsertString    = `INSERT INTO host (host,created_at,updated_at,last_connection, notes, tags) VALUES (?,?,?,?,?,?)`
+	hostInsertString    = `INSERT INTO hosts (host,created_at,updated_at,last_connection, notes, tags) VALUES (?,?,?,?,?,?)`
 	hostOptInsertString = `INSERT INTO host_options (host, key, value) VALUES (?,?,?)`
-	hostUpdateString    = `UPDATE host SET (created_at, updated_at, last_connection, notes, tags) VALUES (?,?,?,?,?) WHERE host=?`
+	hostUpdateString    = `UPDATE hosts SET created_at=?, updated_at=?, last_connection=?, notes=?, tags=?  WHERE host=?`
 	hostOptUpdateString = `INSERT OR IGNORE INTO host_options (host, key, value) VALUES (?, ?, ?);`
-	hostUpSert          = `INSERT INTO host (host, created_at, updated_at, last_connection, notes, tags) VALUES (?, ?, ?, ?, ?, ?) 
+	hostUpSert          = `INSERT INTO hosts (host, created_at, updated_at, last_connection, notes, tags) VALUES (?, ?, ?, ?, ?, ?) 
 ON CONFLICT(host) DO UPDATE SET updated_at=MAX(host.updated_at,excluded.updated_at), last_connection=MAX(host.last_connection, excluded.last_connection), notes=excluded.notes,tags=excluded.tags;`
-	hostDeleteString = `DELETE FROM host WHERE host=?`
+	hostDeleteString = `DELETE FROM hosts WHERE host=?`
 )
 
 func NewHostDao(conn *Connection) *HostDao {
@@ -145,6 +147,7 @@ func (dao *HostDao) Update(host Host) error {
 			}
 		}
 		err = dao.conn.execute(deleteOptString, args...)
+		log.Printf("Args used int host deletion is %v\n", args)
 		if err != nil {
 			return err
 		}
@@ -167,7 +170,7 @@ func generateDeleteStringOpts(host *Host) (string, []any) {
 	args := make([]any, 0, len(host.Options)*3+1)
 
 	for i, opt := range host.Options {
-		if i < len(host.Options)-1 {
+		if i > 0 {
 			deleteBuilder.WriteString(", ")
 		}
 		deleteBuilder.WriteString("(?, ?, ?)")
@@ -175,14 +178,14 @@ func generateDeleteStringOpts(host *Host) (string, []any) {
 	}
 	deleteBuilder.WriteString(")\n")
 	deleteBuilder.WriteString(`
-DELETE FROM host_options ho
-WHERE ho.host = ?
+DELETE FROM host_options
+WHERE host = ?
   AND NOT EXISTS (
       SELECT 1 FROM new_values nv
-      WHERE nv.host  = ho.host
-        AND nv.key   = ho.key
-        AND nv.value = ho.value
-  );
+      WHERE nv.host  = host_options.host
+        AND nv.key   = host_options.key
+        AND nv.value = host_options.value
+  )
 `)
 	args = append(args, host.Host)
 	return deleteBuilder.String(), args
@@ -419,7 +422,7 @@ func (dao *HostDao) Get(host string) (Host, error) {
 		}
 		return nil
 	}
-	err := dao.conn.query(`SELECT * FROM host where host = ?`, onResHostQuery, host)
+	err := dao.conn.query(`SELECT * FROM hosts where host = ?`, onResHostQuery, host)
 	if err != nil {
 		return Host{}, err
 	}
@@ -428,7 +431,7 @@ func (dao *HostDao) Get(host string) (Host, error) {
 }
 
 func (dao *HostDao) GetN(n uint, offset uint) ([]Host, error) {
-	queryString := `SELECT * FROM host LIMIT ? OFFSET ?`
+	queryString := `SELECT * FROM hosts LIMIT ? OFFSET ?`
 	queryOptString := `SELECT * FROM host_options where host = ?`
 	hosts := make([]*Host, 0)
 	err := dao.conn.query(queryString, func(stmt *sqlite.Stmt) error {
@@ -463,7 +466,7 @@ func (dao *HostDao) GetN(n uint, offset uint) ([]Host, error) {
 }
 
 func (dao *HostDao) GetAll() ([]Host, error) {
-	queryString := `SELECT * FROM host`
+	queryString := `SELECT * FROM hosts`
 	queryOptString := `SELECT * FROM host_options`
 	hosts := map[string]*Host{}
 	err := dao.conn.query(queryString, func(stmt *sqlite.Stmt) error {
