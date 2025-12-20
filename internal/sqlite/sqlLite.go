@@ -58,7 +58,7 @@ func (conn *Connection) createTable() error {
 		host TEXT NOT NULL PRIMARY KEY,
 		created_at INTEGER NOT NULL,
 		updated_at INTEGER,
-		last_connected INTEGER,
+		last_connection INTEGER,
 		notes TEXT,
 		tags TEXT
 	);
