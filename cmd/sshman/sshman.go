@@ -9,6 +9,7 @@ import (
 	"andrew/sshman/internal/utils"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path"
@@ -31,6 +32,7 @@ func (o *optionFlags) Set(value string) error {
 func main() {
 	// log level setting
 	logLevel := flag.String("log", "None", "logging level, [Debug, Info, Warning, Error]")
+	logFile := flag.Bool("logFile", true, "set output of logger to log file instead of terminal")
 	// first run flag -- init
 	init := flag.Bool("init", false, "initialize sshman")
 	// quick action commands
@@ -62,27 +64,39 @@ func main() {
 	flag.Parse()
 	if logLevel != nil && *logLevel != "None" {
 		// set up slog here
+		var writer io.Writer
 		lowerCase := strings.ToLower(*logLevel)
+		if *logFile {
+			logFile, err := os.Create(path.Join(xdg.DataHome, config.DefaultAppStorePath, "app.log"))
+			if err != nil {
+				fmt.Printf("Failed to initialize logger")
+				return
+			}
+			defer logFile.Close()
+			writer = logFile
+		} else {
+			writer = os.Stdout
+		}
 		switch lowerCase {
 		case "debug":
-			slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelDebug,
 			})))
 		case "info":
-			slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelInfo,
 			})))
 		case "warning":
-			slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelWarn,
 			})))
 		case "error":
-			slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelError,
 			})))
 		default:
 			_, _ = fmt.Fprintf(os.Stderr, "unkown log level: %s, defualting to info\n", *logLevel)
-			slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelInfo,
 			})))
 		}
