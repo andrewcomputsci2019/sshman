@@ -518,7 +518,7 @@ func (dao *HostDao) GetAll() ([]Host, error) {
 }
 
 func (dao *HostDao) Count() (uint, error) {
-	queryString := `SELECT COUNT(*) FROM host`
+	queryString := `SELECT COUNT(*) FROM hosts`
 	var count uint
 	err := dao.conn.query(queryString, func(stmt *sqlite.Stmt) error {
 		count = uint(stmt.ColumnInt64(0))
