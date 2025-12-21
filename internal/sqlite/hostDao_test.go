@@ -244,3 +244,16 @@ func TestCountAll(t *testing.T) {
 	}
 
 }
+
+func TestUpdateTimeStamp(t *testing.T) {
+	db := NewHostDao(conn)
+	timeStamp := time.Now()
+	db.UpdateLastConnection("New_Host", &timeStamp)
+	validate, err := db.Get("New_Host")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validate.LastConnection == nil {
+		t.Fatalf("Update of last connection timestamp failed, received nil value")
+	}
+}

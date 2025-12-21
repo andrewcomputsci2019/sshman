@@ -542,3 +542,10 @@ func (dao *HostDao) CountOpts(host string) (uint, error) {
 	}
 	return count, nil
 }
+
+// todo wire a update last connection time stamp function
+func (dao *HostDao) UpdateLastConnection(host string, timeStamp *time.Time) error {
+	updateString := `UPDATE hosts SET last_connection=? WHERE host=?`
+	err := dao.conn.execute(updateString, ts(timeStamp), host)
+	return err
+}
