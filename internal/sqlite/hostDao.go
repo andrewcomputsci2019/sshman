@@ -89,7 +89,15 @@ const (
 	hostUpdateString    = `UPDATE hosts SET created_at=?, updated_at=?, last_connection=?, notes=?, tags=?  WHERE host=?`
 	hostOptUpdateString = `INSERT OR IGNORE INTO host_options (host, key, value) VALUES (?, ?, ?);`
 	hostUpSert          = `INSERT INTO hosts (host, created_at, updated_at, last_connection, notes, tags) VALUES (?, ?, ?, ?, ?, ?) 
-ON CONFLICT(host) DO UPDATE SET updated_at=MAX(updated_at,excluded.updated_at), last_connection=MAX(last_connection, excluded.last_connection), notes=excluded.notes,tags=excluded.tags;`
+ON CONFLICT(host) DO UPDATE SET updated_at = COALESCE(
+        MAX(updated_at, excluded.updated_at),
+        updated_at,
+        excluded.updated_at
+    ), last_connection = COALESCE(
+        MAX(last_connection, excluded.last_connection),
+        last_connection,
+        excluded.last_connection
+    ), notes=excluded.notes,tags=excluded.tags;`
 	hostDeleteString = `DELETE FROM hosts WHERE host=?`
 )
 
