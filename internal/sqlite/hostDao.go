@@ -89,7 +89,7 @@ const (
 	hostUpdateString    = `UPDATE hosts SET created_at=?, updated_at=?, last_connection=?, notes=?, tags=?  WHERE host=?`
 	hostOptUpdateString = `INSERT OR IGNORE INTO host_options (host, key, value) VALUES (?, ?, ?);`
 	hostUpSert          = `INSERT INTO hosts (host, created_at, updated_at, last_connection, notes, tags) VALUES (?, ?, ?, ?, ?, ?) 
-ON CONFLICT(host) DO UPDATE SET updated_at=MAX(host.updated_at,excluded.updated_at), last_connection=MAX(host.last_connection, excluded.last_connection), notes=excluded.notes,tags=excluded.tags;`
+ON CONFLICT(host) DO UPDATE SET updated_at=MAX(updated_at,excluded.updated_at), last_connection=MAX(last_connection, excluded.last_connection), notes=excluded.notes,tags=excluded.tags;`
 	hostDeleteString = `DELETE FROM hosts WHERE host=?`
 )
 
@@ -386,6 +386,7 @@ func (dao *HostDao) serializeHostOptionFromStatement(stmt *sqlite.Stmt, host *Ho
 }
 
 func (dao *HostDao) Get(host string) (Host, error) {
+	var found bool
 	hostItem := Host{}
 	onResHostQuery := func(stmt *sqlite.Stmt) error {
 		//hostItem.Host = stmt.GetText("host")
@@ -403,6 +404,7 @@ func (dao *HostDao) Get(host string) (Host, error) {
 		//	hostItem.LastConnection = new(time.Time)
 		//	*hostItem.LastConnection = time.UnixMilli(stmt.ColumnInt64(lastConnectionIdx))
 		//}
+		found = true
 		err := dao.serializeHostFromStatement(stmt, &hostItem)
 		if err != nil {
 			return err
@@ -425,6 +427,9 @@ func (dao *HostDao) Get(host string) (Host, error) {
 	err := dao.conn.query(`SELECT * FROM hosts where host = ?`, onResHostQuery, host)
 	if err != nil {
 		return Host{}, err
+	}
+	if !found {
+		return Host{}, fmt.Errorf("Host Does not exist %s", host)
 	}
 	err = dao.conn.query(`SELECT * FROM host_options where host = ?`, onResOptQuery, host)
 	return hostItem, nil
