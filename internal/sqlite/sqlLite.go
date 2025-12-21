@@ -81,6 +81,10 @@ func (conn *Connection) createTable() error {
 	if err != nil {
 		return err
 	}
+	err = sqlitex.Execute(sqlCon, "PRAGMA foreign_keys = ON", nil)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
