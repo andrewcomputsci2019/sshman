@@ -101,6 +101,7 @@ func ReadConfig(file string) ([]sqlite.Host, error) {
 		}
 		for _, host := range matchedHosts {
 			host.Notes = strings.Join(notes, "\n")
+			host.Options = make([]sqlite.HostOptions, len(options))
 			copy(host.Options, options)
 			for i := range host.Options {
 				host.Options[i].Host = host.Host
