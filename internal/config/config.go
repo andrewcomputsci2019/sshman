@@ -2,7 +2,7 @@ package config
 
 import (
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -28,11 +28,6 @@ const (
 )
 
 type NamedDirectories string
-
-const (
-	KeyStoreDir = "keystore"
-	DatabaseDir = "db"
-)
 
 var KeyGenTypeSet = map[string]struct{}{
 	RSA: {}, ECDSA: {}, ED25519: {},
@@ -69,7 +64,7 @@ func (cfg *Config) String() string {
 	builder.WriteString("\tStorage Path: ")
 	if cfg.StorageConf.StoragePath == "" {
 		pathBase := xdg.DataHome
-		pathBase = path.Join(pathBase, DefaultAppStorePath)
+		pathBase = filepath.Join(pathBase, DefaultAppStorePath)
 		builder.WriteString(pathBase + "\n")
 	} else {
 		builder.WriteString(cfg.StorageConf.StoragePath + "\n")
@@ -103,7 +98,7 @@ func (cfg *Config) String() string {
 	builder.WriteString("\tKey Path: ")
 	if cfg.Ssh.KeyPath == "" {
 		pathBase := xdg.ConfigHome
-		pathBase = path.Join(pathBase, DefaultAppStorePath, KeyStoreDir)
+		pathBase = filepath.Join(pathBase, DefaultAppStorePath, KeyStoreDir)
 		builder.WriteString(pathBase + "\n")
 	} else {
 		builder.WriteString(cfg.Ssh.KeyPath + "\n")
@@ -123,5 +118,5 @@ func (cfg *Config) String() string {
 }
 
 func (c Config) GetSshConfigFilePath() string {
-	return path.Join(xdg.ConfigHome, DefaultAppStorePath, "ssh/config")
+	return filepath.Join(xdg.ConfigHome, DefaultAppStorePath, SshConfigPath)
 }
