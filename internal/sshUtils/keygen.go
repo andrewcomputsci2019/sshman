@@ -2,8 +2,9 @@ package sshUtils
 
 import (
 	"andrew/sshman/internal/config"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,7 +14,10 @@ import (
 	"unicode"
 
 	"github.com/adrg/xdg"
-	"github.com/google/uuid"
+)
+
+const (
+	randomTagSize = 3 // 6 hex random characters
 )
 
 type KeyPair struct {
@@ -58,13 +62,12 @@ func genRSAKey(host string, password string, cfg config.Config) (KeyPair, error)
 	} else {
 		keyGenPath = cfg.Ssh.KeyPath
 	}
-	random_uuid, err := uuid.NewV7()
+	marker, err := newKeyMarker()
 	if err != nil {
-		slog.Warn("Failed to generate a v7 uuid generating a v1 instead", "Error", err)
-		random_uuid = uuid.New()
+		return KeyPair{}, err
 	}
-	comment := config.AppName + ":" + host + ":" + random_uuid.String()
-	filename := "rsa_" + safeHost + "_" + time.Now().Format("20060102")
+	comment := config.AppName + ":" + host + ":" + marker
+	filename := "rsa_" + safeHost + "_" + marker
 	full_path := filepath.Join(keyGenPath, filename)
 	if exist, err := doesFileExist(full_path); exist || err != nil {
 		if err != nil {
@@ -113,13 +116,12 @@ func genECDSAKey(host string, password string, cfg config.Config) (KeyPair, erro
 	} else {
 		keyGenPath = cfg.Ssh.KeyPath
 	}
-	random_uuid, err := uuid.NewV7()
+	marker, err := newKeyMarker()
 	if err != nil {
-		slog.Warn("Failed to generate a v7 uuid generating a v1 instead", "Error", err)
-		random_uuid = uuid.New()
+		return KeyPair{}, err
 	}
-	comment := config.AppName + ":" + host + ":" + random_uuid.String()
-	filename := "ecdsa_" + safeHost + "_" + time.Now().Format("20060102")
+	comment := config.AppName + ":" + host + ":" + marker
+	filename := "ecdsa_" + safeHost + "_" + marker
 	full_path := filepath.Join(keyGenPath, filename)
 	if exist, err := doesFileExist(full_path); exist || err != nil {
 		if err != nil {
@@ -168,13 +170,12 @@ func genED25519Key(host string, password string, cfg config.Config) (KeyPair, er
 	} else {
 		keyGenPath = cfg.Ssh.KeyPath
 	}
-	random_uuid, err := uuid.NewV7()
+	marker, err := newKeyMarker()
 	if err != nil {
-		slog.Warn("Failed to generate a v7 uuid generating a v1 instead", "Error", err)
-		random_uuid = uuid.New()
+		return KeyPair{}, err
 	}
-	comment := config.AppName + ":" + host + ":" + random_uuid.String()
-	filename := "ed25519_" + safeHost + "_" + time.Now().Format("20060102")
+	comment := config.AppName + ":" + host + ":" + marker
+	filename := "ed25519_" + safeHost + "_" + marker
 	full_path := filepath.Join(keyGenPath, filename)
 	if exist, err := doesFileExist(full_path); exist || err != nil {
 		if err != nil {
@@ -227,4 +228,14 @@ func sanitizeName(host string) string {
 			return '_' // replace char with legal char
 		}
 	}, host)
+}
+
+func newKeyMarker() (string, error) {
+	var b [randomTagSize]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	hexPart := hex.EncodeToString(b[:])
+	datePart := time.Now().Format("20060102")
+	return hexPart + "_" + datePart, nil
 }
