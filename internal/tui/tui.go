@@ -42,15 +42,11 @@ type sshProcFinished struct {
 	err error
 }
 
-type PingResult struct {
-	Host          string
-	HostReachable bool
-	Ping          uint
-}
-
-type PingReq struct {
-	Host     string
-	Hostname string
+type pingResult struct {
+	host          string
+	hostReachable bool
+	ping          time.Duration
+	err           error
 }
 
 type AppModel struct {
@@ -219,7 +215,7 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			slog.Error("ssh ran into an error", "error", msg.err)
 		}
 		return a, nil
-	case PingResult:
+	case pingResult:
 		update, cmd := a.hostsModel.Update(msg)
 		a.hostsModel = update.(HostsPanelModel)
 		return a, cmd

@@ -2,10 +2,14 @@ package tui
 
 import (
 	"andrew/sshman/internal/config"
+	"andrew/sshman/internal/ping"
 	"andrew/sshman/internal/sqlite"
 	"fmt"
+	"log/slog"
+	"math"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,6 +162,11 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 		key.WithHelp("esc", " exit/cancel ")),
 }
 
+type hostPingInfo struct {
+	reachable string // 🔴 down, 🟡 ip can be reached port ssh not responding, 🟢 up
+	ping      string // __xunit time part can only have 3 digits and unit must be 2 digits
+}
+
 type HostsModel struct {
 	table         table.Model
 	cfg           config.Config
@@ -170,7 +179,7 @@ func NewHostsModel(cfg config.Config) HostsModel {
 		table.NewFlexColumn(hostHostnameColumnKey, "Hostname", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))).WithFiltered(true),
 		table.NewFlexColumn(hostTagColumnKey, "Tags", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))).WithFiltered(true),
 		table.NewFlexColumn(hostLastConnectedColumnKey, "Last Connected", 1).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))),
-		table.NewColumn(hostPingColumnKey, "Ping", 4).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))),
+		table.NewColumn(hostPingColumnKey, "Ping", 5).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))),
 		table.NewColumn(hostStatusColumnKey, "Status", 6).WithStyle(lipgloss.NewStyle().Align(lipgloss.Left).Foreground(lipgloss.Color("#0c97edff"))),
 	}
 	tbl := table.New(columns).
@@ -851,6 +860,7 @@ type HostsPanelModel struct {
 	tableGrowthBias float32 // value of .70 means table should take 70% of total width
 	width, height   int
 	verticalLayout  bool
+	pingMap         map[string]hostPingInfo
 }
 
 func NewHostsPanelModel(cfg config.Config, hosts []sqlite.Host) HostsPanelModel {
@@ -862,6 +872,7 @@ func NewHostsPanelModel(cfg config.Config, hosts []sqlite.Host) HostsPanelModel 
 		focus:           focusTable,
 		data:            make([]sqlite.Host, len(hosts)),
 		tableGrowthBias: defaultTableBias,
+		pingMap:         make(map[string]hostPingInfo),
 	}
 	copy(panel.data, hosts)
 	panel.table.setFocused(true)
@@ -899,6 +910,8 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h = h.upsertHost(msg.host)
 	case updateHostsMessage: // todo likely not needed as program already saves host update on next event
 		h = h.upsertHost(msg.host)
+	case pingResult:
+		h.updatePingMap(msg)
 	}
 
 	if h.verticalLayout && h.infoPanel.mode != infoEditMode {
@@ -967,9 +980,27 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 				cmds = append(cmds, func() tea.Msg {
-					return PingReq{
-						Host:     host.Host,
-						Hostname: hostOptionValue(host, "Hostname"),
+					hostname := hostOptionValue(host, "Hostname")
+					if hostname == "" {
+						hostname = host.Host
+					}
+					port := hostOptionValue(host, "Port")
+					if port == "" {
+						port = "22"
+					}
+					portNum, err := strconv.Atoi(port)
+					if err != nil {
+						return pingResult{
+							host: host.Host,
+							err:  err,
+						}
+					}
+					res := ping.PingRemoteHost(hostname, uint(portNum), 2*time.Second)
+					return pingResult{
+						host:          host.Host,
+						err:           res.Err,
+						hostReachable: res.Reachable,
+						ping:          res.Latency,
 					}
 				})
 			}
@@ -1042,7 +1073,7 @@ func (h *HostsPanelModel) beginEditSelectedHost() tea.Cmd {
 func (h *HostsPanelModel) refreshTableRows() {
 	rows := make([]table.Row, 0, len(h.data))
 	for i := range h.data {
-		rows = append(rows, hostToRow(&h.data[i], h.table.cfg))
+		rows = append(rows, hostToRow(&h.data[i], h.table.cfg, h.pingMap))
 	}
 	h.table.setRows(rows)
 }
@@ -1072,18 +1103,36 @@ func (h HostsPanelModel) upsertHost(host sqlite.Host) HostsPanelModel {
 	return h
 }
 
+func (h *HostsPanelModel) updatePingMap(p pingResult) {
+	info := hostPingInfo{}
+	if p.err != nil {
+		slog.Error("Error Pinging Remote Host", "Host", p.host, "Error", p.err)
+		info.ping = "n/a"
+		info.reachable = "🔴"
+		h.pingMap[p.host] = info
+		return
+	}
+	if p.hostReachable {
+		info.reachable = "🟢"
+	} else {
+		info.reachable = "🟡"
+	}
+	info.ping = formatDurationCompact(p.ping)
+	h.pingMap[p.host] = info
+}
+
 type connectHostMessage struct {
 	host sqlite.Host
 }
 
-func hostToRow(host *sqlite.Host, cfg config.Config) table.Row {
+func hostToRow(host *sqlite.Host, cfg config.Config, pingMap map[string]hostPingInfo) table.Row {
 	row := table.NewRow(table.RowData{
 		hostColumnKey:              host.Host,
 		hostHostnameColumnKey:      hostOptionValue(host, "Hostname"),
 		hostTagColumnKey:           strings.Join(host.Tags, ","),
 		hostLastConnectedColumnKey: formatLastConnected(host.LastConnection),
-		hostPingColumnKey:          formatPing(cfg.EnablePing),
-		hostStatusColumnKey:        formatHostStatus(cfg.EnablePing),
+		hostPingColumnKey:          formatPing(cfg.EnablePing, host.Host, pingMap),
+		hostStatusColumnKey:        formatHostStatus(cfg.EnablePing, host.Host, pingMap),
 		hostRowPayloadKey:          host,
 	})
 	return row
@@ -1106,19 +1155,68 @@ func formatLastConnected(ts *time.Time) string {
 }
 
 // todo add ping ability
-func formatPing(enabled bool) string {
+func formatPing(enabled bool, host string, pingMap map[string]hostPingInfo) string {
 	if !enabled {
 		return "disabled"
 	}
-	return "n/a"
+	if info, ok := pingMap[host]; !ok {
+		return "n/a"
+	} else {
+		return info.ping
+	}
 }
 
 // todo add ping ability
-func formatHostStatus(pingEnabled bool) string {
+func formatHostStatus(pingEnabled bool, host string, pingMap map[string]hostPingInfo) string {
 	if !pingEnabled {
-		return "unknown"
+		return "disabled"
 	}
-	return "?"
+	if info, ok := pingMap[host]; !ok {
+		return "?"
+	} else {
+		return info.reachable
+	}
+}
+
+func formatDurationCompact(d time.Duration) string {
+	type unitSpec struct {
+		unit  time.Duration
+		label string
+	}
+	units := []unitSpec{
+		{unit: time.Second, label: "s"},
+		{unit: time.Millisecond, label: "ms"},
+		{unit: time.Microsecond, label: "us"},
+		{unit: time.Nanosecond, label: "ns"},
+	}
+
+	chosen := units[len(units)-1]
+	for _, candidate := range units {
+		if d < candidate.unit {
+			continue
+		}
+		value := float64(d) / float64(candidate.unit)
+		if value < 1000 {
+			chosen = candidate
+			break
+		}
+	}
+
+	value := float64(d) / float64(chosen.unit)
+	number := formatCompactNumber(value)
+	unit := fmt.Sprintf("%-2s", chosen.label)
+	return number + unit
+}
+
+func formatCompactNumber(value float64) string {
+	if value >= 10 {
+		return fmt.Sprintf("%.0f", value)
+	}
+	rounded := math.Round(value*10) / 10
+	if rounded >= 10 {
+		return fmt.Sprintf("%.0f", rounded)
+	}
+	return fmt.Sprintf("%.1f", rounded)
 }
 
 func startConnectCmd(host sqlite.Host) tea.Cmd {
