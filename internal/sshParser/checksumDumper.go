@@ -26,6 +26,10 @@ func IsSame(file string) (bool, error) {
 	ext := path.Ext(filename)
 	filename = strings.TrimSuffix(filename, ext)
 	dumpLoc := path.Join(dataDir, config.AppName, checksumDir, filename)
+	return isSameInternal(file, dumpLoc)
+}
+
+func isSameInternal(file string, dumpLoc string) (bool, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return false, err
@@ -48,7 +52,6 @@ func IsSame(file string) (bool, error) {
 		slog.Error("Failed to read checksum file", "file", file, "err", err)
 		return false, nil
 	}
-
 	return bytes.Equal(checksum, data), nil
 }
 
@@ -58,6 +61,10 @@ func DumpCheckSum(file string) error {
 	ext := path.Ext(filename)
 	filename = strings.TrimSuffix(filename, ext)
 	fileDumpPath := path.Join(xdg.DataHome, config.AppName, checksumDir, filename)
+	return dumpCheckSumInternal(file, fileDumpPath)
+}
+
+func dumpCheckSumInternal(file string, fileDumpPath string) error {
 	f, err := os.Open(file)
 	if err != nil {
 		slog.Error("Failed to open file to compute checksum for", "file", file, "err", err)

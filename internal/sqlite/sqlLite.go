@@ -58,7 +58,7 @@ func (conn *Connection) createTable() error {
 		host TEXT NOT NULL PRIMARY KEY,
 		created_at INTEGER NOT NULL,
 		updated_at INTEGER,
-		last_connected INTEGER,
+		last_connection INTEGER,
 		notes TEXT,
 		tags TEXT
 	);
@@ -78,6 +78,10 @@ func (conn *Connection) createTable() error {
     ON host_options(key)
 	`
 	err := sqlitex.ExecScript(sqlCon, createTableString)
+	if err != nil {
+		return err
+	}
+	err = sqlitex.Execute(sqlCon, "PRAGMA foreign_keys = ON", nil)
 	if err != nil {
 		return err
 	}

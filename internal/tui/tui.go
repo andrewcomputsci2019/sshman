@@ -6,6 +6,7 @@ import (
 	"andrew/sshman/internal/sshParser"
 	"log/slog"
 	"os/exec"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -175,6 +176,11 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 	case connectHostMessage:
+		timeStamp := time.Now()
+		err := a.db.UpdateLastConnection(msg.host.Host, &timeStamp)
+		if err != nil {
+			slog.Warn("Failed to update last connection timestamp", "Hosts", msg.host, "Error", err)
+		}
 		if a.pendingWrite {
 			// todo write out host from db into serialization file
 			// to do this get all Host from database and then serialize them all back into the config file
