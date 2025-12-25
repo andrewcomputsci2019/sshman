@@ -7,7 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -190,8 +190,8 @@ func SerializeHostToFile(file string, hosts []sqlite.Host) error {
 				return err
 			}
 			defer originalF.Close()
-			dir, fileName := path.Split(file)
-			copyFileName := path.Join(dir, fileName+".old")
+			dir, fileName := filepath.Split(file)
+			copyFileName := filepath.Join(dir, fileName+".old")
 			copyF, err := os.Create(copyFileName)
 			if err != nil {
 				return err

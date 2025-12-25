@@ -2,7 +2,7 @@ package sshParser
 
 import (
 	"os"
-	"path"
+	path "path/filepath"
 	"testing"
 )
 

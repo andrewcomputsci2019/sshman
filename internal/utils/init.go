@@ -5,7 +5,7 @@ import (
 	"andrew/sshman/internal/config"
 	"log/slog"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/adrg/xdg"
 )
@@ -31,8 +31,8 @@ func InitProjectStructure() error {
 
 // createKeyStorageIfNotExist creates the dir of $XDG_DATA_HOME/ssh_man/keystore
 func createKeyStorageIfNotExist() error {
-	checkSumPath := path.Join(xdg.DataHome, config.AppName, "keystore")
-	err := os.MkdirAll(checkSumPath, 0700)
+	checkSumPath := filepath.Join(xdg.ConfigHome, config.AppName, config.KeyStoreDir)
+	err := os.MkdirAll(checkSumPath, 0760)
 	if err != nil {
 		slog.Error("Failed to create keystore directory", "path", checkSumPath, "error", err)
 		return err
@@ -42,8 +42,8 @@ func createKeyStorageIfNotExist() error {
 
 // createChecksumDirIfNotExist creates the dir of $XDG_DATA_HOME/ssh_man/checksums/
 func createChecksumDirIfNotExist() error {
-	checkSumPath := path.Join(xdg.DataHome, config.AppName, "checksums")
-	err := os.MkdirAll(checkSumPath, 0700)
+	checkSumPath := filepath.Join(xdg.DataHome, config.AppName, "checksums")
+	err := os.MkdirAll(checkSumPath, 0760)
 	if err != nil {
 		slog.Error("Failed to create checksums directory", "path", checkSumPath, "error", err)
 		return err
@@ -51,10 +51,10 @@ func createChecksumDirIfNotExist() error {
 	return nil
 }
 
-// createSshConfigDirIfNotExist create the dir of $XDG_DATA_HOME/ssh_man/sshConfig/
+// createSshConfigDirIfNotExist create the dir of $XDG_CONFIG_HOME/ssh_man/ssh/
 func createSshConfigDirIfNotExist() error {
-	configPath := path.Join(xdg.DataHome, config.AppName, "sshConfig")
-	err := os.MkdirAll(configPath, 0700)
+	configPath := filepath.Join(xdg.ConfigHome, config.AppName, config.SshConfigPath)
+	err := os.MkdirAll(filepath.Dir(configPath), 0760)
 	if err != nil {
 		slog.Error("Failed to create ssh config dir", "path", configPath, "error", err)
 		return err
