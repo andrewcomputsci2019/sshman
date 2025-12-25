@@ -123,9 +123,19 @@ func demoHosts() []sqlite.Host {
 			Notes:     "Playground box for testing host editing workflow",
 			Tags:      []string{"dev", "scratch"},
 			Options: []sqlite.HostOptions{
-				{Key: "Hostname", Value: "192.168.0.44"},
-				{Key: "User", Value: "andrew"},
+				{Key: "Hostname", Value: "192.168.0.96"},
+				{Key: "User", Value: "admin"},
 				{Key: "ProxyJump", Value: "bastion"},
+			},
+		},
+		{
+			Host:      "ping-test",
+			CreatedAt: now.Add(-26 * time.Hour),
+			Notes:     "Test Ping Command",
+			Tags:      []string{"ping"},
+			Options: []sqlite.HostOptions{
+				{Key: "User", Value: "test"},
+				{Key: "Hostname", Value: "localhost"},
 			},
 		},
 	}
