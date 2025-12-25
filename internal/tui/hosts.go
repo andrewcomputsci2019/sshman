@@ -912,6 +912,7 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h = h.upsertHost(msg.host)
 	case pingResult:
 		h.updatePingMap(msg)
+		h.refreshTableRows()
 	}
 
 	if h.verticalLayout && h.infoPanel.mode != infoEditMode {
