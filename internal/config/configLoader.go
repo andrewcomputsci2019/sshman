@@ -128,7 +128,7 @@ func ValidateConfig(config *Config) error {
 		}
 	}
 
-	if config.Ssh.AcceptableKeyGenAlgorithms != nil {
+	if len(config.Ssh.AcceptableKeyGenAlgorithms) > 0 {
 		for _, algorithm := range config.Ssh.AcceptableKeyGenAlgorithms {
 			_, ok := KeyGenTypeSet[strings.ToUpper(algorithm)]
 			if !ok {
