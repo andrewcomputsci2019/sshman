@@ -543,9 +543,21 @@ func (dao *HostDao) CountOpts(host string) (uint, error) {
 	return count, nil
 }
 
-// todo wire a update last connection time stamp function
 func (dao *HostDao) UpdateLastConnection(host string, timeStamp *time.Time) error {
 	updateString := `UPDATE hosts SET last_connection=? WHERE host=?`
 	err := dao.conn.execute(updateString, ts(timeStamp), host)
 	return err
+}
+
+func (dao *HostDao) GetAllHostsIdentityKeys(host string) ([]string, error) {
+	searchString := `SELECT value FROM host_options where host = ? and key = IdentityFile`
+	var keys []string
+	err := dao.conn.query(searchString, func(stmt *sqlite.Stmt) error {
+		keys = append(keys, stmt.GetText("value"))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
 }
