@@ -194,6 +194,7 @@ func NewKeyRotateModel(host string, keys []string, cfg config.Config) KeyRotateM
 	// then again ask for a key gen algorithm from config passed in
 	// and then a confirm button
 	ownedKeys := make([]string, 0)
+	ownedKeys = append(ownedKeys, "None")
 	for _, key := range keys {
 		if strings.HasPrefix(key, "~/") { // in case user has keys added manually using ~
 			home, err := os.UserHomeDir()
@@ -271,6 +272,9 @@ func NewKeyRotateModel(host string, keys []string, cfg config.Config) KeyRotateM
 		password := form.GetString(KEY_GEN_PASSWORD)
 		hostString := host
 		keyToRotate := form.GetString(ROTATE_KEY_STR_KEY)
+		if keyToRotate == "None" {
+			keyToRotate = ""
+		}
 		keyPair, err := sshUtils.GenKey(hostString, keyGenType, password, cfg)
 		return keyRotateRequest{
 			newKeySet:  keyPair,
