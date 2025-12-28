@@ -46,27 +46,29 @@ const (
 )
 
 type TableKeyBinds struct {
-	Up        key.Binding
-	Down      key.Binding
-	Left      key.Binding
-	Right     key.Binding
-	Edit      key.Binding
-	Add       key.Binding
-	Delete    key.Binding
-	Select    key.Binding
-	Ping      key.Binding
-	CycleView key.Binding
+	Up          key.Binding
+	Down        key.Binding
+	Left        key.Binding
+	Right       key.Binding
+	Edit        key.Binding
+	Add         key.Binding
+	Delete      key.Binding
+	Select      key.Binding
+	Ping        key.Binding
+	GenerateKey key.Binding
+	RotateKey   key.Binding
+	CycleView   key.Binding
 }
 
 func (t TableKeyBinds) ShortHelp() []key.Binding {
-	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete, t.Select, t.CycleView, t.Ping}
+	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete, t.Select, t.CycleView, t.Ping, t.GenerateKey, t.RotateKey}
 }
 
 func (t TableKeyBinds) FullHelp() [][]key.Binding {
 	binds := make([][]key.Binding, 0)
 	binds = append(binds, []key.Binding{t.Up, t.Down, t.Left, t.Right})
 	binds = append(binds, []key.Binding{t.Edit, t.Add, t.Delete})
-	binds = append(binds, []key.Binding{t.Select, t.CycleView, t.Ping})
+	binds = append(binds, []key.Binding{t.Select, t.CycleView, t.Ping, t.GenerateKey, t.RotateKey})
 	return binds
 }
 
@@ -123,6 +125,14 @@ var tableKeyMap TableKeyBinds = TableKeyBinds{
 	Ping: key.NewBinding(
 		key.WithKeys("p"),
 		key.WithHelp("p", "ping host"),
+	),
+	GenerateKey: key.NewBinding(
+		key.WithKeys("g"),
+		key.WithHelp("g", "generate key"),
+	),
+	RotateKey: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "rotate keys"),
 	),
 	CycleView: key.NewBinding(
 		key.WithKeys("ctrl+w"),
@@ -1004,6 +1014,24 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						ping:          res.Latency,
 					}
 				})
+			case key.Matches(keyMsg, tableKeyMap.GenerateKey) && !h.table.table.GetIsFilterInputFocused():
+				host := h.table.highlightedHost()
+				if host == nil {
+					break
+				}
+				cmds = append(cmds, func() tea.Msg {
+					return startKeyGenerationForm{host.Host}
+				})
+			case key.Matches(keyMsg, tableKeyMap.RotateKey) && !h.table.table.GetIsFilterInputFocused():
+				host := h.table.highlightedHost()
+				if host == nil {
+					break
+				}
+				cmds = append(cmds, func() tea.Msg {
+					return startKeyRotateForm{
+						host: host.Host,
+					}
+				})
 			}
 		} else {
 			switch {
@@ -1239,7 +1267,7 @@ func buildHostPreview(host sqlite.Host) string {
 	for _, opt := range opts {
 		builder.WriteString(fmt.Sprintf("  %s %s\n", opt.Key, opt.Value))
 	}
-	// dont include tags when constructing preview string
+	// do not include tags when constructing preview string
 	// if len(host.Tags) > 0 {
 	// 	builder.WriteString("Tags: ")
 	// 	builder.WriteString(strings.Join(host.Tags, ","))
