@@ -561,3 +561,9 @@ func (dao *HostDao) GetAllHostsIdentityKeys(host string) ([]string, error) {
 	}
 	return keys, nil
 }
+
+func (dao *HostDao) RegisterNewIdentityKeyForHost(host string, keyPath string) error {
+	insertString := `INSERT into host_options (host, key, value) VALUES (?,'IdentityFile',?)`
+	err := dao.conn.execute(insertString, host, keyPath)
+	return err
+}
