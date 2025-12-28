@@ -233,6 +233,34 @@ func TestGenED25519WithSanitizeName(t *testing.T) {
 	}
 }
 
+func TestGetKeyComment(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.Config{}
+	cfg.Ssh.KeyPath = dir
+	hoststr := "example.com"
+	keyPair, err := genED25519Key(hoststr, "", cfg)
+	if err != nil {
+		t.Fatalf("Failed to generate rsa key pair with password: Error %v", err)
+	}
+	comment, err := getKeyComment(keyPair.PrivateKey, sanitizeName(hoststr))
+	if err != nil {
+		t.Fatalf("Failed to extract a comment from given private key. Private key: %v , Error: %v", keyPair.PrivateKey, err)
+	}
+	sections := strings.Split(comment, ":")
+	if len(sections) != 3 {
+		t.Fatalf("Should be 3 parts to the comment")
+	}
+	if sections[0] != "ssh_man" {
+		t.Fatalf("Section 0 should be the string ssh_man but was %v", sections[0])
+	}
+	if sections[1] != sanitizeName(hoststr) {
+		t.Fatalf("Section 1 should be the sanitized host string")
+	}
+	if !usesMarkerTag(sections[2]) {
+		t.Fatalf("Marker tag should be in an identical format as file")
+	}
+}
+
 /*
 	Utilities to check key strings are valid
 */
