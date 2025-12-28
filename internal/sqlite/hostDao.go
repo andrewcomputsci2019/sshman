@@ -550,12 +550,12 @@ func (dao *HostDao) UpdateLastConnection(host string, timeStamp *time.Time) erro
 }
 
 func (dao *HostDao) GetAllHostsIdentityKeys(host string) ([]string, error) {
-	searchString := `SELECT value FROM host_options where host = ? and key = IdentityFile`
+	searchString := `SELECT value FROM host_options where host = ? and key = 'IdentityFile'`
 	var keys []string
 	err := dao.conn.query(searchString, func(stmt *sqlite.Stmt) error {
 		keys = append(keys, stmt.GetText("value"))
 		return nil
-	})
+	}, host)
 	if err != nil {
 		return nil, err
 	}
