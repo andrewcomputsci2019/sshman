@@ -14,7 +14,7 @@ type FooterModel struct {
 
 func NewFooterModel() FooterModel {
 	return FooterModel{
-		height: 1,
+		height: 2,
 		h:      help.New(),
 	}
 }
