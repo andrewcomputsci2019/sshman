@@ -31,6 +31,7 @@ type KeyRotateModel struct {
 type abortedKeyGenForm struct{} // tells parent model that the form has been aborted by the user, so it can close the form
 
 type keyGenResult struct { // this informs the parent model not form that the forms is done and key is generated
+	host    string
 	keyPair sshUtils.KeyPair
 	err     error
 }
@@ -38,6 +39,7 @@ type keyGenResult struct { // this informs the parent model not form that the fo
 type abortedRotatedKeyForm struct{}
 
 type keyRotateRequest struct {
+	host       string
 	oldKeyPath string           // path to the old key to be replaced, if empty user wants to just add new key to server
 	newKeySet  sshUtils.KeyPair // new key set
 	err        error
@@ -123,6 +125,7 @@ func NewKeyGenModel(host string, cfg config.Config) KeyGenModel {
 		hostString := host
 		keyPair, err := sshUtils.GenKey(hostString, keyGenType, password, cfg)
 		return keyGenResult{
+			host:    hostString,
 			err:     err,
 			keyPair: keyPair,
 		}
@@ -277,6 +280,7 @@ func NewKeyRotateModel(host string, keys []string, cfg config.Config) KeyRotateM
 		}
 		keyPair, err := sshUtils.GenKey(hostString, keyGenType, password, cfg)
 		return keyRotateRequest{
+			host:       hostString,
 			newKeySet:  keyPair,
 			oldKeyPath: keyToRotate,
 			err:        err,
