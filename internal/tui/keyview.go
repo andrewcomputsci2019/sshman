@@ -101,7 +101,7 @@ func NewKeyGenModel(host string, cfg config.Config) KeyGenModel {
 				return fmt.Errorf("Password field is empty")
 			}
 			if password != s {
-				return fmt.Errorf("Passwords dodo not match")
+				return fmt.Errorf("Passwords do not match")
 			}
 			return nil
 		}),
