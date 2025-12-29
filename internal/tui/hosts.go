@@ -153,8 +153,8 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 		key.WithKeys("shift+tab"),
 		key.WithHelp("shift+tab", " prev ")),
 	CollapseToggle: key.NewBinding(
-		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", " collapse ")),
+		key.WithKeys("shift+c"),
+		key.WithHelp("shift+c", " collapse ")),
 	Save: key.NewBinding(
 		key.WithKeys("ctrl+s"),
 		key.WithHelp("ctrl+s", " save ")),
