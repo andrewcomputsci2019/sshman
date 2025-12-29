@@ -12,7 +12,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/cellbuf"
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
 const (
@@ -424,7 +424,7 @@ func (a AppModel) View() string {
 	base := lipgloss.JoinVertical(lipgloss.Left, header, center, footer)
 	if a.keyModal.visible {
 		dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(base)
-		return overlayView(dimmed, a.keyModalView(), a.width, a.height)
+		return overlayView(dimmed, a.keyModalView())
 	}
 	return base
 }
@@ -456,30 +456,11 @@ func (a AppModel) keyModalView() string {
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		Padding(1, 2).
-		Width(60).
+		Padding(2, 2).
+		Width(max(a.width/2, 60)).
 		Render(title + "\n\n" + body + "\n\nPress enter or esc to close")
 }
 
-func overlayView(base, modal string, width, height int) string {
-	if width <= 0 || height <= 0 {
-		return base
-	}
-	buf := cellbuf.NewBuffer(width, height)
-	cellbuf.SetContent(buf, base)
-	modalWidth := lipgloss.Width(modal)
-	modalHeight := lipgloss.Height(modal)
-	if modalWidth <= 0 || modalHeight <= 0 {
-		return cellbuf.Render(buf)
-	}
-	if modalWidth > width {
-		modalWidth = width
-	}
-	if modalHeight > height {
-		modalHeight = height
-	}
-	x := (width - modalWidth) / 2
-	y := (height - modalHeight) / 2
-	cellbuf.SetContentRect(buf, modal, cellbuf.Rect(x, y, modalWidth, modalHeight))
-	return cellbuf.Render(buf)
+func overlayView(base, modal string) string {
+	return overlay.Composite(modal, base, overlay.Center, overlay.Center, 0, 0)
 }
