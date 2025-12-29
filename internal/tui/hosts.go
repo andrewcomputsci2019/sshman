@@ -1108,12 +1108,18 @@ func (h *HostsPanelModel) refreshTableRows() {
 }
 
 func (h *HostsPanelModel) syncInfoWithSelection() {
+	h.syncInfoWithSelectionForced(false)
+}
+
+func (h *HostsPanelModel) syncInfoWithSelectionForced(forced bool) {
 	host := h.table.highlightedHost()
 	if host == nil {
 		h.infoPanel.clearHost()
 		return
 	}
 	if host.Host != h.infoPanel.currentEditHost.Host {
+		h.infoPanel.loadHost(*host)
+	} else if forced {
 		h.infoPanel.loadHost(*host)
 	}
 }
@@ -1128,7 +1134,7 @@ func (h HostsPanelModel) upsertHost(host sqlite.Host) HostsPanelModel {
 		h.data = append(h.data, host)
 	}
 	h.refreshTableRows()
-	h.syncInfoWithSelection()
+	h.syncInfoWithSelectionForced(true)
 	return h
 }
 
