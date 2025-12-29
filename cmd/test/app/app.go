@@ -5,6 +5,7 @@ import (
 	"andrew/sshman/internal/sqlite"
 	"andrew/sshman/internal/tui"
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,7 +16,12 @@ func main() {
 		fmt.Printf("Error: %s", err)
 	}
 	hostDao := sqlite.NewHostDao(db)
-	app := tui.NewAppModel([]sqlite.Host{}, hostDao, config.Config{})
+	cfg := config.Config{}
+	cfg.Ssh.KeyPath = os.TempDir()
+	cfg.StorageConf.WriteThrough = new(bool)
+	*cfg.StorageConf.WriteThrough = false
+	cfg.DevMode = true
+	app := tui.NewAppModel([]sqlite.Host{}, hostDao, cfg)
 	program := tea.NewProgram(app, tea.WithAltScreen())
 	if _, err := program.Run(); err != nil {
 		fmt.Printf("err: %s", err)

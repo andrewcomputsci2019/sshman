@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,9 +30,11 @@ type hostPanelHarnessModel struct {
 
 func newHostPanelHarnessModel() hostPanelHarnessModel {
 	cfg := config.Config{
+		DevMode:    true,
 		EnablePing: true,
 		Ssh: config.SSH{
 			KeyOnly: true,
+			KeyPath: filepath.Join(os.TempDir(), "ssh_man_keys"),
 		},
 	}
 	return hostPanelHarnessModel{
