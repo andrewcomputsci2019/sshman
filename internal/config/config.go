@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -34,6 +35,7 @@ var KeyGenTypeSet = map[string]struct{}{
 }
 
 type Config struct {
+	DevMode     bool
 	StorageConf StorageConfig `yaml:"storage_config"`
 	Ssh         SSH           `yaml:"ssh"`
 	EnablePing  bool          `yaml:"enable_ping"` // trys to ping host to see if they are up and reports their ping
@@ -118,5 +120,8 @@ func (cfg *Config) String() string {
 }
 
 func (c Config) GetSshConfigFilePath() string {
+	if c.DevMode {
+		return filepath.Join(os.TempDir(), "ssh_man_dev_config")
+	}
 	return filepath.Join(xdg.ConfigHome, DefaultAppStorePath, SshConfigPath)
 }
