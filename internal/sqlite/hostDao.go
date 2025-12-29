@@ -562,8 +562,14 @@ func (dao *HostDao) GetAllHostsIdentityKeys(host string) ([]string, error) {
 	return keys, nil
 }
 
-func (dao *HostDao) RegisterNewIdentityKeyForHost(host string, keyPath string) error {
+func (dao *HostDao) RegisterNewIdentityKeyForHost(host, keyPath string) error {
 	insertString := `INSERT into host_options (host, key, value) VALUES (?,'IdentityFile',?)`
 	err := dao.conn.execute(insertString, host, keyPath)
+	return err
+}
+
+func (dao *HostDao) DeRegisterIdentityKeyFromHost(host, keyPath string) error {
+	removalString := `DELETE from host_options where host = ? and key = 'IdentityFile' and value = ?`
+	err := dao.conn.execute(removalString, host, keyPath)
 	return err
 }

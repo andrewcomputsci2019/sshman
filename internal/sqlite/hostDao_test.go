@@ -301,3 +301,21 @@ func TestGetAllKeys(t *testing.T) {
 		t.Fatalf("Keys were not returned as they were expected. Array: %v", keys)
 	}
 }
+
+func TestDeRegisterIdentityKeyFromHost(t *testing.T) {
+	db := NewHostDao(conn)
+	err := db.DeRegisterIdentityKeyFromHost("Host_TEST2", "~/.ssh/second")
+	if err != nil {
+		t.Fatalf("failed to deregister key from host. Error %v", err)
+	}
+	keys, err := db.GetAllHostsIdentityKeys("Host_TEST2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) > 1 {
+		t.Fatalf("should only be 1 key")
+	}
+	if keys[0] == "~/.ssh/second" {
+		t.Fatalf("key should have been removed yet still exists")
+	}
+}
