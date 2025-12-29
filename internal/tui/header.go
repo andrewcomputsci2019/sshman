@@ -50,9 +50,9 @@ func (h HeaderModel) View() string {
 	//TODO implement me, render build info, program name, total host, etc
 	separator := "⏺"
 	numHostString := strconv.Itoa(int(h.numberOfHost))
-	majorStyle := lipgloss.NewStyle().Background(lipgloss.Color("#54cb25ff")).Foreground(lipgloss.Color("#000"))
-	minorVersion := lipgloss.NewStyle().Background(lipgloss.Color("#1dc4b6ff")).Foreground(lipgloss.Color("#000"))
-	patchVersion := lipgloss.NewStyle().Background(lipgloss.Color("#2c7dc4ff")).Foreground(lipgloss.Color("#000"))
+	majorStyle := lipgloss.NewStyle().Background(lipgloss.Color("46")).Foreground(lipgloss.Color("#000"))
+	minorVersion := lipgloss.NewStyle().Background(lipgloss.Color("51")).Foreground(lipgloss.Color("#000"))
+	patchVersion := lipgloss.NewStyle().Background(lipgloss.Color("39")).Foreground(lipgloss.Color("#000"))
 	base := lipgloss.NewStyle().Foreground(lipgloss.Color("#fff"))
 	render := lipgloss.JoinHorizontal(lipgloss.Left,
 		base.Render("🛠️\t"+h.programName+" "+separator+" "),
