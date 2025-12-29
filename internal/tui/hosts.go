@@ -813,9 +813,14 @@ func (h HostsInfoModel) renderOptions() string {
 		if h.mode == infoEditMode && h.selected == idx && !opt.neverEditable {
 			if opt.focusedField == optionFieldKey {
 				keyStr = opt.key.View()
+				valStr = clampTextWidth(valStr, opt.val.Width)
 			} else {
+				keyStr = clampTextWidth(keyStr, opt.key.Width)
 				valStr = opt.val.View()
 			}
+		} else {
+			keyStr = clampTextWidth(keyStr, opt.key.Width)
+			valStr = clampTextWidth(valStr, opt.val.Width)
 		}
 		lines[idx] = fmt.Sprintf("%s%s: %s", indicator, keyStr, valStr)
 		if opt.neverEditable {
@@ -823,6 +828,13 @@ func (h HostsInfoModel) renderOptions() string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func clampTextWidth(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	return lipgloss.NewStyle().MaxWidth(width).Inline(true).Render(value)
 }
 
 func (h HostsInfoModel) renderNotes() string {
