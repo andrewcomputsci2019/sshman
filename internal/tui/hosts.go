@@ -469,7 +469,8 @@ func (h HostsInfoModel) View() string {
 	sections = append(sections, h.renderNotes())
 
 	if h.shouldRenderPreview() {
-		h.previewOptionScrollPane.SetContent(h.HostPreviewString)
+		wrapped := lipgloss.NewStyle().MaxWidth(h.previewOptionScrollPane.Width - 2).Render(h.HostPreviewString)
+		h.previewOptionScrollPane.SetContent(wrapped)
 		sections = append(sections, lipgloss.NewStyle().Bold(true).Render("Preview"))
 		sections = append(sections, h.previewOptionScrollPane.View())
 	}
