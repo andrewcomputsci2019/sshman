@@ -813,11 +813,11 @@ func (h HostsInfoModel) renderOptions() string {
 		valStr := opt.val.Value()
 		if h.mode == infoEditMode && h.selected == idx && !opt.neverEditable {
 			if opt.focusedField == optionFieldKey {
-				keyStr = opt.key.View()
-				valStr = clampTextWidth(valStr, opt.val.Width)
+				keyStr = clampTextWidth(opt.key.View(), opt.key.Width+2)
+				valStr = clampTextWidth(valStr, opt.val.Width-2)
 			} else {
-				keyStr = clampTextWidth(keyStr, opt.key.Width)
-				valStr = opt.val.View()
+				keyStr = clampTextWidth(keyStr, opt.key.Width-2)
+				valStr = clampTextWidth(opt.val.View(), opt.val.Width+2)
 			}
 		} else {
 			keyStr = clampTextWidth(keyStr, opt.key.Width)
