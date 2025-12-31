@@ -51,6 +51,7 @@ const (
 	KEY_GEN_PASSWORD          = "KEY_GEN_PASSWORD"
 	KEY_GEN_PASSWORD_VALIDATE = "KEY_GEN_PASSWORD_VALIDATE"
 	OLD_KEY_GEN_TO_REPLACE    = "OLD_KEY_REPLACE"
+	AFFIRM_BOOL_KEY           = "CONFIRM_OPERATION"
 	ROTATE_KEY_STR_KEY        = "SELECTED_KEY_TO_ROTATE"
 )
 
@@ -106,6 +107,7 @@ func NewKeyGenModel(host string, cfg config.Config) KeyGenModel {
 			return nil
 		}),
 		huh.NewConfirm().
+			Key(AFFIRM_BOOL_KEY).
 			Title("Generate Key").
 			Affirmative("Yes").
 			Negative("No"),
@@ -120,6 +122,9 @@ func NewKeyGenModel(host string, cfg config.Config) KeyGenModel {
 		return abortedKeyGenForm{}
 	}
 	form.SubmitCmd = func() tea.Msg {
+		if !form.GetBool(AFFIRM_BOOL_KEY) {
+			return abortedKeyGenForm{}
+		}
 		keyGenType := form.GetString(KEY_GEN_ALGO_STR_KEY)
 		password := form.GetString(KEY_GEN_PASSWORD)
 		hostString := host
@@ -130,6 +135,10 @@ func NewKeyGenModel(host string, cfg config.Config) KeyGenModel {
 			keyPair: keyPair,
 		}
 	}
+	keyMap := huh.NewDefaultKeyMap()
+	keyMap.Quit.SetKeys("ctrl+q")
+	keyMap.Quit.SetHelp("ctrl+q", "quit form")
+	form.WithKeyMap(keyMap)
 	return KeyGenModel{
 		width:   45,
 		height:  20,
@@ -258,6 +267,7 @@ func NewKeyRotateModel(host string, keys []string, cfg config.Config) KeyRotateM
 					return nil
 				}),
 			huh.NewConfirm().
+				Key(AFFIRM_BOOL_KEY).
 				Title("Rotate Key").
 				Affirmative("Yes").
 				Negative("No"),
@@ -271,6 +281,9 @@ func NewKeyRotateModel(host string, keys []string, cfg config.Config) KeyRotateM
 		return abortedRotatedKeyForm{}
 	}
 	form.SubmitCmd = func() tea.Msg {
+		if !form.GetBool(AFFIRM_BOOL_KEY) {
+			return abortedRotatedKeyForm{}
+		}
 		keyGenType := form.GetString(KEY_GEN_ALGO_STR_KEY)
 		password := form.GetString(KEY_GEN_PASSWORD)
 		hostString := host
@@ -286,6 +299,10 @@ func NewKeyRotateModel(host string, keys []string, cfg config.Config) KeyRotateM
 			err:        err,
 		}
 	}
+	keyMap := huh.NewDefaultKeyMap()
+	keyMap.Quit.SetKeys("ctrl+q")
+	keyMap.Quit.SetHelp("ctrl+q", "quit form")
+	form.WithKeyMap(keyMap)
 	return KeyRotateModel{
 		width:   45,
 		height:  20,
