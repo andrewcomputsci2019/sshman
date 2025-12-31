@@ -415,6 +415,9 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					Host:  host,
 				})
 				for _, optRow := range w.hostOptions {
+					if len(strings.TrimSpace(optRow.key.Value())) == 0 {
+						continue
+					}
 					options = append(options, sqlite.HostOptions{
 						ID:    0,
 						Key:   optRow.key.Value(),
