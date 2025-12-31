@@ -2,7 +2,7 @@ package sqlite
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -155,7 +155,7 @@ func (dao *HostDao) Update(host Host) error {
 			}
 		}
 		err = dao.conn.execute(deleteOptString, args...)
-		log.Printf("Args used int host deletion is %v\n", args)
+		slog.Info(fmt.Sprintf("Args used int host deletion is %v\n", args))
 		if err != nil {
 			return err
 		}
