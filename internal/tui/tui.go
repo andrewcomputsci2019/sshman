@@ -231,15 +231,18 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, exeCommand
 
 	case tea.KeyMsg:
-		if a.keyModal.visible && (msg.String() == "esc" || msg.String() == "enter") {
-			a.keyModal.visible = false
-			return a, nil
-		}
 		if msg.Type == tea.KeyCtrlC {
 			if a.pendingWrite {
 				// todo serialize host config file
 			}
 			return a, tea.Quit
+		}
+		if a.keyModal.visible {
+			if msg.String() == "esc" || msg.String() == "enter" {
+				a.keyModal.visible = false
+				a.focusState = mainViewMode
+			}
+			return a, nil
 		}
 		if a.focusState == mainViewMode {
 			model, cmd := a.hostsModel.Update(msg)
@@ -251,9 +254,17 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.keyForm = model.(KeyGenModel)
 			return a, cmd
 		}
+		if a.focusState == rotateKeyGenForm {
+			model, cmd := a.keyRotateForm.Update(msg)
+			a.keyRotateForm = model.(KeyRotateModel)
+			return a, cmd
+		}
+		if a.focusState == wizardMode {
 		model, cmd := a.wizard.Update(msg)
 		a.wizard = model.(WizardViewModel)
 		return a, cmd
+		}
+		return a, nil
 	case sshProcFinished:
 		if msg.err != nil {
 			slog.Error("ssh ran into an error", "error", msg.err)
@@ -408,7 +419,7 @@ func (a AppModel) View() string {
 		center = lipgloss.NewStyle().Width(a.width).
 			Height(a.keyForm.height).
 			Align(lipgloss.Center).
-			Render(a.keyForm.View())
+			Render(a.keyRotateForm.View())
 	default:
 		center = lipgloss.NewStyle().Width(a.width).
 			Height(a.wizard.height).
