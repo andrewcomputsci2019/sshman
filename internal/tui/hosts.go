@@ -73,16 +73,18 @@ func (t TableKeyBinds) FullHelp() [][]key.Binding {
 }
 
 type InfoViewKeyBinds struct {
-	Up             key.Binding // j
-	Down           key.Binding // k
-	Next           key.Binding // tab
-	Prev           key.Binding // shift tab
-	CollapseToggle key.Binding // alt-c
-	Save           key.Binding // ctrl-s only works in edit mode
-	AddOption      key.Binding // ctrl-a
-	DeleteOption   key.Binding // ctrl-d
-	ChangeView     key.Binding // ctrl-w
-	CancelView     key.Binding // this is like exit and go back to table focus
+	Up                key.Binding // j
+	Down              key.Binding // k
+	Next              key.Binding // tab
+	Prev              key.Binding // shift tab
+	CollapseToggle    key.Binding // alt-c
+	Save              key.Binding // ctrl-s only works in edit mode
+	AddOption         key.Binding // ctrl-a
+	DeleteOption      key.Binding // ctrl-d
+	ChangeView        key.Binding // ctrl-w
+	CancelView        key.Binding // this is like exit and go back to table focus
+	ScrollDownPreview key.Binding
+	ScrollUpPreview   key.Binding
 }
 
 func (i InfoViewKeyBinds) ShortHelp() []key.Binding {
@@ -170,6 +172,14 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 	CancelView: key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", " exit/cancel ")),
+	ScrollUpPreview: key.NewBinding(
+		key.WithKeys("ctrl+k"),
+		key.WithHelp("ctrl+k", "scroll preview up"),
+	),
+	ScrollDownPreview: key.NewBinding(
+		key.WithKeys("ctrl+j"),
+		key.WithHelp("ctrl+j", "scroll preview down"),
+	),
 }
 
 type hostPingInfo struct {
@@ -516,6 +526,8 @@ func (h *HostsInfoModel) loadHost(host sqlite.Host) {
 	h.hostNotes.SetValue(host.Notes)
 	h.tagsInput.SetValue(strings.Join(host.Tags, ","))
 	h.HostPreviewString = buildHostPreview(host)
+	h.previewOptionScrollPane.SetXOffset(0)
+	h.previewOptionScrollPane.SetYOffset(0)
 	h.setHostOptions(host)
 	h.selected = h.firstEditableIndex()
 	if h.selected < 0 {
@@ -846,7 +858,7 @@ func (h HostsInfoModel) renderNotes() string {
 	if value == "" {
 		return "(no notes)"
 	}
-	return value
+	return lipgloss.NewStyle().Width(h.hostNotes.Width()).Render(value)
 }
 
 func (h HostsInfoModel) renderTags() string {
@@ -1052,6 +1064,13 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				h.focus = focusTable
 				h.table.setFocused(true)
 				h.infoPanel.ExitEditMode()
+			case key.Matches(keyMsg, infoPanelKeyMap.ScrollUpPreview):
+				h.infoPanel.previewOptionScrollPane.YOffset--
+				if h.infoPanel.previewOptionScrollPane.YOffset < 0 {
+					h.infoPanel.previewOptionScrollPane.YOffset = 0
+				}
+			case key.Matches(keyMsg, infoPanelKeyMap.ScrollDownPreview):
+				h.infoPanel.previewOptionScrollPane.YOffset = min(len(strings.Split(h.infoPanel.HostPreviewString, "\n"))+1-h.infoPanel.previewOptionScrollPane.Height, h.infoPanel.previewOptionScrollPane.YOffset+1)
 			}
 		}
 	}
@@ -1292,10 +1311,13 @@ func buildHostPreview(host sqlite.Host) string {
 	// 	builder.WriteString(strings.Join(host.Tags, ","))
 	// 	builder.WriteRune('\n')
 	// }
-	if note := strings.TrimSpace(host.Notes); note != "" {
-		builder.WriteString("# ")
-		builder.WriteString(note)
-		builder.WriteRune('\n')
+	for _, notes := range strings.Split(host.Notes, "\n") {
+		if strings.TrimSpace(notes) == "" {
+			continue
+		}
+		builder.WriteString("#")
+		builder.WriteString(strings.TrimSpace(notes))
+		builder.WriteString("\n")
 	}
 	return strings.TrimRight(builder.String(), "\n")
 }
