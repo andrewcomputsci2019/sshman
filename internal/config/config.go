@@ -52,6 +52,7 @@ type SSH struct {
 	KeyOnly                    bool     `yaml:"key_only,omitempty"`
 	KeyPath                    string   `yaml:"key_path,omitempty"`                  // where to store generated keys
 	AcceptableKeyGenAlgorithms []string `yaml:"acceptable_key_algorithms,omitempty"` // Note this will reject DSA if provided
+	RemovePubKeyAfterGen       bool     `yaml:"remove_pub_after_gen,omitempty"`
 }
 
 func (cfg *Config) String() string {
