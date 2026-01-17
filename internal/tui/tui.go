@@ -5,11 +5,15 @@ import (
 	"andrew/sshman/internal/sqlite"
 	"andrew/sshman/internal/sshParser"
 	"andrew/sshman/internal/sshUtils"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	overlay "github.com/rmhubbert/bubbletea-overlay"
@@ -63,37 +67,85 @@ type startKeyGenerationForm struct {
 }
 
 type removeOldKeyRequest struct {
-	host   string
-	oldKey string
+	host       string
+	oldKey     string
+	newKeyPair sshUtils.KeyPair
+	err        error
 }
 
 type removeOldKeyResult struct {
-	host   string
-	oldKey string
-	err    error
+	host          string
+	oldKey        string
+	newKeyPair    sshUtils.KeyPair
+	err           error
+	keyWasRemoved bool // shows wether the script ran or not
+	statusMsg     string
+}
+
+type failedToCopyKey struct {
+	pair sshUtils.KeyPair
+	err  error
 }
 
 type keyModalState struct {
-	visible bool
+	visible bool // focus state
 	pubKey  string
+	err     error
+}
+
+// todo hook up modal to show when rotating keys to get user consent to script usage
+
+type rotateKeyRemoveModalState struct {
+	visible     bool // focus state
+	err         error
+	host        string
+	keyPair     sshUtils.KeyPair
+	keyToRemove string
+	scriptView  viewport.Model
+	script      string
+	cmd         tea.Cmd
+}
+
+type rotateKeyCopyModalState struct {
+	visible bool // focus state
+	err     error
+	host    string
+	keys    sshUtils.KeyPair
+	oldKey  string
+	cmd     tea.Cmd
+}
+
+type rotateKeyResultModal struct {
+	visible bool // focus state
+	err     error
+	message string
+}
+
+type failedToCopyModal struct {
+	visible bool
+	pair    sshUtils.KeyPair
 	err     error
 }
 
 type AppModel struct {
 	width, height int // this constitutes the entire terminal size
 	// app components
-	footer        FooterModel
-	header        HeaderModel
-	hostsModel    HostsPanelModel
-	wizard        WizardViewModel
-	keyForm       KeyGenModel
-	keyRotateForm KeyRotateModel
-	focusState    int
-	db            *sqlite.HostDao
-	pendingWrite  bool          // used to detect if write is needed before calling ssh process (only useful when writeThrough is disabled)
-	cfg           config.Config // used to check if writeThrough is enabled if so forces
-	sshOpts       []string
-	keyModal      keyModalState
+	footer                FooterModel
+	header                HeaderModel
+	hostsModel            HostsPanelModel
+	wizard                WizardViewModel
+	keyForm               KeyGenModel
+	keyRotateForm         KeyRotateModel
+	focusState            int
+	db                    *sqlite.HostDao
+	pendingWrite          bool          // used to detect if write is needed before calling ssh process (only useful when writeThrough is disabled)
+	cfg                   config.Config // used to check if writeThrough is enabled if so forces
+	sshOpts               []string
+	keyModal              keyModalState
+	rotateCopyModal       rotateKeyCopyModalState
+	rotateRemoveKeyModal  rotateKeyRemoveModalState
+	rotateResultModal     rotateKeyResultModal
+	rotateCopyFailedModal failedToCopyModal
 }
 
 // todo implement model func
@@ -111,12 +163,12 @@ func runSSHProgram(host sqlite.Host, sshPath string, configPath string, options 
 	// note options need to be passed with a prefix of -o
 	var c *exec.Cmd
 	if sshPath == "" {
-		args := []string{"-f", configPath}
+		args := []string{"-F", configPath}
 		args = append(args, options...)
 		args = append(args, host.Host)
 		c = exec.Command("ssh", args...)
 	} else {
-		args := []string{"-f", configPath}
+		args := []string{"-F", configPath}
 		args = append(args, options...)
 		args = append(args, host.Host)
 		c = exec.Command(sshPath, args...)
@@ -237,9 +289,91 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, tea.Quit
 		}
+		// check if any modal is visible
+		// going to be honest i think resetting the focus state is not needed since its adjusted in the modal
+		// creation but im going to leave it in case something changes in future and that isn't true
 		if a.keyModal.visible {
 			if msg.String() == "esc" || msg.String() == "enter" {
 				a.keyModal.visible = false
+				a.focusState = mainViewMode
+			}
+			return a, nil
+		} else if a.rotateCopyModal.visible { // todo implement these blocks that handle modal views
+			if msg.String() == "esc" {
+				a.rotateCopyModal.visible = false
+				a.focusState = mainViewMode
+				if a.rotateCopyModal.err == nil {
+					// show results screen with pub and private key loc
+					status := "User canceled copy request\n"
+					newKeys := "New keys can be found: " + a.rotateCopyModal.keys.PrivateKey + "(.pub)\n"
+					oldKeys := "To remove the old key from remote server look for the comment that matches the private key"
+					a.rotateResultModal = rotateKeyResultModal{
+						err:     nil,
+						message: fmt.Sprintf("%s%s%s", status, newKeys, oldKeys),
+						visible: true,
+					}
+				}
+			} else if msg.String() == "enter" {
+				if a.rotateCopyModal.err == nil {
+					a.rotateCopyModal.visible = false
+					a.focusState = mainViewMode
+					return a, a.rotateCopyModal.cmd
+				} else { // if error is not nil accept enter as esc, this was because an error was generated producing the keys
+					a.rotateCopyModal.visible = false
+					a.focusState = mainViewMode
+				}
+			}
+			return a, nil
+		} else if a.rotateCopyFailedModal.visible {
+			if msg.String() == "esc" || msg.String() == "enter" {
+				a.rotateCopyFailedModal.visible = false
+				a.focusState = mainViewMode
+			}
+
+		} else if a.rotateRemoveKeyModal.visible { // this will need extra work for handling viewport navigation
+			if a.rotateRemoveKeyModal.err != nil && (msg.String() == "enter" || msg.String() == "esc") {
+				a.rotateRemoveKeyModal.visible = false
+				a.focusState = mainViewMode
+				return a, nil
+			}
+			if msg.String() == "enter" {
+				a.rotateRemoveKeyModal.visible = false
+				a.focusState = mainViewMode
+				return a, a.rotateRemoveKeyModal.cmd
+			}
+			if msg.String() == "esc" {
+				// here we should show the results modal
+				// should say that the key has been copied but the old key has not been removed
+				a.rotateRemoveKeyModal.visible = false
+				statusMsg := "New Key %s was copied to remote.\nOld key %s was not removed from remote and should be removed"
+				statusMsg = fmt.Sprintf(statusMsg, filepath.Base(a.rotateRemoveKeyModal.keyPair.PubKey), filepath.Base(a.rotateRemoveKeyModal.keyToRemove))
+				a.rotateResultModal = rotateKeyResultModal{
+					visible: true,
+					err:     nil,
+					message: statusMsg,
+				}
+			}
+			// view port handling
+			if msg.String() == "left" || msg.String() == "h" || msg.String() == "right" || msg.String() == "l" {
+				m, cmd := a.rotateRemoveKeyModal.scriptView.Update(msg)
+				a.rotateRemoveKeyModal.scriptView = m
+				return a, cmd
+			}
+			if msg.String() == "k" || msg.String() == "up" {
+				if a.rotateRemoveKeyModal.scriptView.YOffset >= 1 {
+					a.rotateRemoveKeyModal.scriptView.YOffset--
+				}
+				return a, nil
+			}
+			if msg.String() == "i" || msg.String() == "down" {
+				a.rotateRemoveKeyModal.scriptView.YOffset++
+				return a, nil
+			}
+			return a, nil
+
+		} else if a.rotateResultModal.visible { // enter and esc being only options here
+			if msg.String() == "esc" || msg.String() == "enter" {
+				a.rotateResultModal.visible = false
 				a.focusState = mainViewMode
 			}
 			return a, nil
@@ -260,9 +394,9 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, cmd
 		}
 		if a.focusState == wizardMode {
-		model, cmd := a.wizard.Update(msg)
-		a.wizard = model.(WizardViewModel)
-		return a, cmd
+			model, cmd := a.wizard.Update(msg)
+			a.wizard = model.(WizardViewModel)
+			return a, cmd
 		}
 		return a, nil
 	case sshProcFinished:
@@ -336,47 +470,120 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 	case keyRotateRequest:
-		cmd := tea.ExecProcess(sshUtils.CopyKey(msg.newKeySet.PubKey, msg.host, a.cfg, a.sshOpts...),
-			func(err error) tea.Msg {
-				if err != nil {
-					slog.Warn("Copy program failed to upload new key", "error", err, "host", msg.host, "public key", msg.newKeySet.PubKey)
-					return abortedRotatedKeyForm{}
-				}
-				return removeOldKeyRequest{
-					host:   msg.host,
-					oldKey: msg.oldKeyPath,
-				}
-			})
-		return a, cmd
+		// todo show modal then okay the request if user accepts
+		// we should still create the exec object now, to show its string representation
+		// in the modal
+		// the rest of this needs to be hookup to another message like keyRotateMsg
+		// enter to accept
+		// esc to cancel
+		// if the user exit here don't remove the old key from the host
+
+		a.rotateCopyModal = newRotateCopyModal(msg)
+		if msg.err == nil {
+			err := a.db.RegisterNewIdentityKeyForHost(msg.host, msg.newKeySet.PrivateKey)
+			if err != nil {
+				a.rotateCopyModal.err = err
+				return a, nil
+			}
+			cmd := tea.ExecProcess(sshUtils.CopyKey(msg.newKeySet.PubKey, msg.host, a.cfg, a.sshOpts...),
+				func(err error) tea.Msg {
+					if err != nil {
+						slog.Warn("Copy program failed to upload new key", "error", err, "host", msg.host, "public key", msg.newKeySet.PubKey)
+						return failedToCopyKey{
+							err:  err,
+							pair: msg.newKeySet,
+						}
+					}
+					if a.cfg.Ssh.RemovePubKeyAfterGen {
+						err := os.Remove(msg.newKeySet.PubKey)
+						if err != nil {
+							slog.Warn(
+								"Failed to remove pub key from keystore after copy", "PubKey", msg.newKeySet.PubKey,
+								"err", err,
+							)
+						}
+					}
+					return removeOldKeyRequest{
+						host:       msg.host,
+						oldKey:     msg.oldKeyPath,
+						newKeyPair: msg.newKeySet,
+					}
+				})
+
+			a.rotateCopyModal.cmd = cmd
+			return a, nil
+		}
+		return a, nil
+	case failedToCopyKey:
+		a.rotateCopyFailedModal = newFailedToCopyModal(msg)
+		return a, nil
 	case removeOldKeyRequest:
+		// ask user if they want to continue with the request
+		// the modal should show the key name being removed
+		// the modal should also show the script using a viewport so the user can scroll through what the script is going to run
+		// enter accept
+		// esc cancel --> in this case send a removeOldKeyResult msg so the old key is at least de registered from host file
+
+		if msg.oldKey == "" { // case where users does not want to remove old key
+			a.rotateResultModal = rotateKeyResultModal{
+				visible: true,
+				err:     nil,
+				message: "Key uploaded to remote, no key to remove operation complete",
+			}
+			return a, nil
+		}
 		proc, err := sshUtils.RemoveOldKeyFromRemoteServer(msg.oldKey, msg.host, a.cfg, a.sshOpts...)
 		if err != nil {
 			slog.Warn("Failed to create a remote key removal script", "error", err)
 			a.focusState = mainViewMode
+			a.rotateResultModal = newRotateResultModal(removeOldKeyResult{
+				err:           err,
+				oldKey:        msg.oldKey,
+				newKeyPair:    msg.newKeyPair,
+				keyWasRemoved: false,
+				statusMsg:     "Failed to generate removal script, likely due to key not being managed by ssh_man",
+			})
 			return a, nil
 		}
 		cmd := tea.ExecProcess(proc, func(err error) tea.Msg {
 			return removeOldKeyResult{
-				host:   msg.host,
-				err:    err,
-				oldKey: msg.oldKey,
+				host:          msg.host,
+				err:           err,
+				oldKey:        msg.oldKey,
+				newKeyPair:    msg.newKeyPair,
+				keyWasRemoved: err == nil,
 			}
 		})
-		return a, cmd
+		a.rotateRemoveKeyModal = newRotateRemoveModal(msg)
+		a.rotateRemoveKeyModal.cmd = cmd
+		a.rotateRemoveKeyModal.scriptView.SetHorizontalStep(5)
+		a.rotateRemoveKeyModal.scriptView.Height = 6
+		a.rotateRemoveKeyModal.script = proc.String()
+		return a, nil
 	case removeOldKeyResult:
 		a.focusState = mainViewMode
+		a.rotateResultModal = newRotateResultModal(msg)
 		if msg.err != nil {
 			slog.Warn("failed to remove old key from remote server", "host", msg.host, "key", msg.oldKey, "error", msg.err)
+			a.rotateResultModal.message = "Failed to remove old key from server due to error: " + msg.err.Error()
 			return a, nil
 		}
 		err := a.db.DeRegisterIdentityKeyFromHost(msg.host, msg.oldKey)
 		if err != nil {
 			slog.Warn("failed to delete key registered to host from database", "error", err, "host", msg.host, "key", msg.oldKey)
+			a.rotateResultModal.message = "New key was uploaded to server but failed to remove old one from database, error: " + err.Error()
 			return a, nil
 		}
-		err = os.Remove(msg.oldKey)
-		if err != nil {
-			slog.Warn("failed to delete key from disk", "file", msg.oldKey, "error", err)
+		if msg.keyWasRemoved {
+			err = os.Remove(msg.oldKey)
+			if err != nil {
+				slog.Warn("failed to delete key from disk", "file", msg.oldKey, "error", err)
+				a.rotateResultModal.message = "New key was uploaded but failed to remove old key: " + filepath.Base(msg.oldKey) + "\n from disk"
+			} else {
+				a.rotateResultModal.message = "New Key was uploaded and old key was removed from config and remote server"
+			}
+		} else {
+			a.rotateResultModal.message = fmt.Sprintf("New Key %s was uploaded\nOld Key %s was not removed from remote", filepath.Base(msg.newKeyPair.PubKey), filepath.Base(msg.oldKey))
 		}
 		return a, nil
 	default:
@@ -437,6 +644,22 @@ func (a AppModel) View() string {
 		dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(base)
 		return overlayView(dimmed, a.keyModalView())
 	}
+	if a.rotateCopyModal.visible {
+		dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(base)
+		return overlayView(dimmed, a.rotateKeyCopyModalView())
+	}
+	if a.rotateCopyFailedModal.visible {
+		dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(base)
+		return overlayView(dimmed, a.rotateFailedToCopyKeyModalView())
+	}
+	if a.rotateRemoveKeyModal.visible {
+		dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(base)
+		return overlayView(dimmed, a.rotateKeyRemoveModalView())
+	}
+	if a.rotateResultModal.visible {
+		dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(base)
+		return overlayView(dimmed, a.rotateKeyResultView())
+	}
 	return base
 }
 
@@ -456,6 +679,7 @@ func NewAppModel(hosts []sqlite.Host, db *sqlite.HostDao, cfg config.Config, ssh
 		cfg:        cfg,
 	}
 	appModel.footer.currentKeymap = appModel.hostsModel
+	appModel.rotateRemoveKeyModal.scriptView = viewport.New(60, 15)
 	return appModel
 }
 
@@ -472,6 +696,215 @@ func (a AppModel) keyModalView() string {
 		Render(title + "\n\n" + body + "\n\nPress enter or esc to close")
 }
 
+func (a AppModel) rotateKeyCopyModalView() string {
+	width := max(60, a.width/2)
+	title := lipgloss.NewStyle().Bold(true).Render("Copy Key To Remote")
+	msg := fmt.Sprintf("Do you wish to copy key %s to remote %s", filepath.Base(a.rotateCopyModal.keys.PubKey), a.rotateCopyModal.host)
+	tail := lipgloss.NewStyle().Bold(true).Render("Press enter to proceeded or Esc to cancel")
+	if a.rotateCopyModal.err != nil {
+		msg = fmt.Sprintf("Cannot Copy key to remote for reason %s", a.rotateCopyModal.err)
+		tail = "Press enter or esc to close"
+	}
+
+	content := fmt.Sprintf("%s\n%s\n\n%s\n", title, msg, tail)
+	return lipgloss.NewStyle().Border(lipgloss.NormalBorder()).
+		Width(width).
+		Padding(2, 2).
+		Render(content)
+}
+
+func (a AppModel) rotateKeyRemoveModalView() string {
+	width := max(70, a.width/2)
+	a.rotateRemoveKeyModal.scriptView.Width = width
+	title := lipgloss.NewStyle().Bold(true).Render("Remove Key From Remote")
+	var content string
+	var tail string
+	if a.rotateRemoveKeyModal.err != nil { //
+		content = "Error encountered. Error: " + a.rotateRemoveKeyModal.err.Error()
+		tail = "\nPress enter or esc to close"
+	} else {
+		// content = a.rotateRemoveKeyModal.script
+		content = lipgloss.NewStyle().Width(width - 2).Render(a.rotateRemoveKeyModal.script)
+		tail = "\nPress enter to continue or esc to cancel"
+	}
+	a.rotateRemoveKeyModal.scriptView.SetContent(content)
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		Width(width).
+		Padding(2, 2).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, a.rotateRemoveKeyModal.scriptView.View()), tail)
+}
+
+func (a AppModel) rotateKeyResultView() string {
+	width := max(60, a.width/2)
+	title := lipgloss.NewStyle().Bold(true).Render("Key Rotation Result")
+	topSeparator := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("/", width-4))
+	bottomSeparator := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("\\", width-4))
+	content := fmt.Sprintf("%s\n%s\n%s\n%s\n\nPress enter or esc to close", title, topSeparator, a.rotateResultModal.message, bottomSeparator)
+
+	return lipgloss.NewStyle().Border(lipgloss.NormalBorder()).
+		Width(width).
+		Padding(2, 2).
+		Render(content)
+}
+
+func (a AppModel) rotateFailedToCopyKeyModalView() string {
+	width := max(60, a.width/2)
+	title := lipgloss.NewStyle().Bold(true).Render("Copy Failed")
+	errMsg := "Encountered error: " + a.rotateCopyFailedModal.err.Error()
+	content := "Key(s) Location: " + a.rotateCopyFailedModal.pair.PrivateKey + "(.pub)"
+	tail := "Press enter or esc to close"
+	base := fmt.Sprintf("%s\n%s\n%s\n%s", title, errMsg, content, tail)
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		Width(width).
+		Padding(2, 2).
+		Render(base)
+}
+
 func overlayView(base, modal string) string {
 	return overlay.Composite(modal, base, overlay.Center, overlay.Center, 0, 0)
+}
+
+func overlayViewWithOffsets(base, modal string, xOff, yOff int) string {
+	return overlay.Composite(modal, base, overlay.Center, overlay.Center, xOff, yOff)
+}
+
+// modal related code
+func newRotateCopyModal(req keyRotateRequest) rotateKeyCopyModalState {
+	return rotateKeyCopyModalState{
+		visible: true,
+		err:     req.err,
+		host:    req.host,
+		oldKey:  req.oldKeyPath,
+		keys:    req.newKeySet,
+	}
+}
+
+func newRotateRemoveModal(req removeOldKeyRequest) rotateKeyRemoveModalState {
+	return rotateKeyRemoveModalState{
+		visible:     true,
+		err:         req.err,
+		host:        req.host,
+		keyPair:     req.newKeyPair,
+		keyToRemove: req.oldKey,
+		scriptView:  viewport.New(30, 6),
+	}
+}
+
+func newRotateResultModal(req removeOldKeyResult) rotateKeyResultModal {
+	return rotateKeyResultModal{
+		visible: true,
+		err:     req.err,
+		message: req.statusMsg,
+	}
+}
+
+func newFailedToCopyModal(req failedToCopyKey) failedToCopyModal {
+	return failedToCopyModal{
+		err:     req.err,
+		visible: true,
+		pair:    req.pair,
+	}
+}
+
+// helpers for debugging ui layouts for modals
+
+// showKeyCopyModal debug util for checking if the modal ui is displayed correctly
+//
+// err should be nil if the modal should be displayed normally and
+// non nil if the modal should show an error instead
+func (a *AppModel) ShowKeyCopyModal(err error) {
+	// todo show modal with faux data
+	if !a.cfg.DevMode {
+		return
+	}
+	a.rotateCopyModal = rotateKeyCopyModalState{
+		visible: true,
+		err:     err,
+		host:    "DEBUG LAYOUT",
+		keys: sshUtils.KeyPair{
+			PrivateKey: filepath.Join(a.cfg.Ssh.KeyPath, "debug_test"),
+			PubKey:     filepath.Join(a.cfg.Ssh.KeyPath, "debug_test.pub"),
+		},
+		oldKey: "Just A test",
+		cmd:    tea.SetWindowTitle("Key Copy inited next step"),
+	}
+}
+
+// showKeyFailedCopyModal debug util for checking if the modal ui is displayed correctly
+//
+// err should be supplied and non nil
+func (a *AppModel) ShowKeyFailedCopyModal(err error) {
+	// todo show modal with
+	if !a.cfg.DevMode || err == nil {
+		return
+	}
+
+	a.rotateCopyFailedModal = failedToCopyModal{
+		visible: true,
+		pair: sshUtils.KeyPair{
+			PrivateKey: filepath.Join(a.cfg.Ssh.KeyPath, "debug_test"),
+			PubKey:     filepath.Join(a.cfg.Ssh.KeyPath, "debug_test.pub"),
+		},
+		err: err,
+	}
+}
+
+// showKeyRemoveModal debug util for checking if the modal ui is displayed correctly
+//
+// err should be non nil if the modal should display an error
+func (a *AppModel) ShowKeyRemoveModal(err error) {
+	if !a.cfg.DevMode {
+		return
+	}
+	sampleScriptText := "This is some long text that will test the viewport ability to render content\nthat spans many columns this text will have many rows as well to test scalability,\nif the content does not wrap correctly then something is wrong The viewport uses default key binds provided by cham these include left,right,h,l,up,down,i,k. \nIdeally this content should display cleanly and clearly allowing a user to see a script before it runs; and make the informed choice of wether they want to continue to run the script after inspection."
+
+	a.rotateRemoveKeyModal = rotateKeyRemoveModalState{
+		visible: true,
+		err:     err,
+		host:    "myHost",
+		keyPair: sshUtils.KeyPair{
+			PrivateKey: filepath.Join(a.cfg.Ssh.KeyPath, "debug_test"),
+			PubKey:     filepath.Join(a.cfg.Ssh.KeyPath, "debug_test.pub"),
+		},
+		keyToRemove: "TEST_KEY",
+		scriptView:  viewport.New(60, 6),
+		script:      sampleScriptText,
+		cmd:         tea.SetWindowTitle("rotateKeyRemoveModel inited next step"),
+	}
+	a.rotateRemoveKeyModal.scriptView.SetHorizontalStep(5)
+}
+
+// showKeyRemoveResultModal debug util for checking if the modal ui is displayed correctly
+//
+// err should be non nil if the modal should display an error
+func (a *AppModel) ShowKeyRemoveResultModal(err error) {
+	if !a.cfg.DevMode {
+		return
+	}
+	a.rotateResultModal = rotateKeyResultModal{
+		visible: true,
+		err:     err,
+		message: `This is a test message, where this would be a status message on the outcome of the rotate key automation
+		event. An example would be User canceled the remove key event, the new key was copied but the old key was not removed from
+		the remote`,
+	}
+}
+
+func (a *AppModel) ShowKeyGenModal(err error) {
+	if !a.cfg.DevMode {
+		return
+	}
+	if err != nil {
+		a.keyModal = keyModalState{
+			visible: true,
+			err:     err,
+		}
+	} else {
+		a.keyModal = keyModalState{
+			visible: true,
+			pubKey:  "example pub key would go on this line",
+		}
+	}
 }
