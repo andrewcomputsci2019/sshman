@@ -263,6 +263,8 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		err := a.db.UpdateLastConnection(msg.host.Host, &timeStamp)
 		if err != nil {
 			slog.Warn("Failed to update last connection timestamp", "Hosts", msg.host, "Error", err)
+		} else {
+			a.hostsModel.updateLastConnection(msg.host.Host, timeStamp)
 		}
 		if a.pendingWrite {
 			// todo write out host from db into serialization file

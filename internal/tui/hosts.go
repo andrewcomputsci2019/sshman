@@ -1188,6 +1188,19 @@ func (h *HostsPanelModel) updatePingMap(p pingResult) {
 	h.pingMap[p.host] = info
 }
 
+func (h *HostsPanelModel) updateLastConnection(host string, connectionTimeStamp time.Time) {
+	idx := slices.IndexFunc(h.data, func(existing sqlite.Host) bool {
+		return existing.Host == host
+	})
+	if idx == -1 {
+		return
+	}
+	tmp := new(time.Time)
+	*tmp = connectionTimeStamp
+	h.data[idx].LastConnection = tmp
+	h.refreshTableRows()
+}
+
 type connectHostMessage struct {
 	host sqlite.Host
 }
