@@ -19,7 +19,7 @@ func main() {
 	cfg := config.Config{}
 	cfg.Ssh.KeyPath = os.TempDir()
 	cfg.StorageConf.WriteThrough = new(bool)
-	*cfg.StorageConf.WriteThrough = false
+	*cfg.StorageConf.WriteThrough = true
 	cfg.DevMode = true
 	app := tui.NewAppModel([]sqlite.Host{}, hostDao, cfg)
 	program := tea.NewProgram(app, tea.WithAltScreen())
