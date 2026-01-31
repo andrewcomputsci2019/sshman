@@ -19,6 +19,7 @@ func main() {
 	cfg := config.Config{}
 	cfg.Ssh.KeyPath = os.TempDir()
 	cfg.StorageConf.WriteThrough = new(bool)
+	cfg.EnablePing = true
 	*cfg.StorageConf.WriteThrough = true
 	cfg.DevMode = true
 	app := tui.NewAppModel([]sqlite.Host{}, hostDao, cfg)
