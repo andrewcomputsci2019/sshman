@@ -2,7 +2,7 @@ package sqlite
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -155,7 +155,7 @@ func (dao *HostDao) Update(host Host) error {
 			}
 		}
 		err = dao.conn.execute(deleteOptString, args...)
-		log.Printf("Args used int host deletion is %v\n", args)
+		slog.Info(fmt.Sprintf("Args used int host deletion is %v\n", args))
 		if err != nil {
 			return err
 		}
@@ -543,9 +543,41 @@ func (dao *HostDao) CountOpts(host string) (uint, error) {
 	return count, nil
 }
 
-// todo wire a update last connection time stamp function
 func (dao *HostDao) UpdateLastConnection(host string, timeStamp *time.Time) error {
 	updateString := `UPDATE hosts SET last_connection=? WHERE host=?`
 	err := dao.conn.execute(updateString, ts(timeStamp), host)
+	return err
+}
+
+func (dao *HostDao) GetAllHostsIdentityKeys(host string) ([]string, error) {
+	searchString := `SELECT value FROM host_options where host = ? and key = 'IdentityFile'`
+	var keys []string
+	err := dao.conn.query(searchString, func(stmt *sqlite.Stmt) error {
+		keys = append(keys, stmt.GetText("value"))
+		return nil
+	}, host)
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
+func (dao *HostDao) RegisterNewIdentityKeyForHost(host, keyPath string) error {
+	insertString := `INSERT into host_options (host, key, value) VALUES (?,'IdentityFile',?)`
+	err := dao.conn.execute(insertString, host, keyPath)
+	return err
+}
+
+func (dao *HostDao) DeRegisterIdentityKeyFromHost(host, keyPath string) error {
+	removalString := `DELETE from host_options where host = ? and key = 'IdentityFile' and value = ?`
+	rowsChangedCheck := func(stmt *sqlite.Stmt) error {
+
+		if dao.conn.conn.Changes() < 1 {
+			return fmt.Errorf("Could not delete %s host from table", host)
+		}
+
+		return nil
+	}
+	err := dao.conn.executeWithResultFunc(removalString, rowsChangedCheck, host, keyPath)
 	return err
 }

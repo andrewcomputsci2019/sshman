@@ -4,6 +4,7 @@ import (
 	"log"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -128,7 +129,23 @@ func TestInsertMany(t *testing.T) {
 }
 
 func TestUpdateMany(t *testing.T) {
-
+	host, err := NewHostDao(conn).Get("Host_TEST2")
+	if err != nil {
+		t.Fatalf("Host_TEST2 is missing from the database during Update many test run")
+	}
+	host.Options[0].Value = "MyUserNowUpdated"
+	host.Notes += "   updated!!!!"
+	err = NewHostDao(conn).UpdateMany(host)
+	if err != nil {
+		t.Fatalf("Failed to update many with Host_TEST2. Error %v", err)
+	}
+	host, err = NewHostDao(conn).Get("Host_TEST2")
+	if err != nil {
+		t.Fatalf("Failed to get Host after update. Error %v", err)
+	}
+	if !strings.HasSuffix(host.Notes, "   updated!!!!") || host.Options[0].Value != "MyUserNowUpdated" {
+		t.Fatalf("Host was not updated after running update sql method")
+	}
 }
 
 func TestUpsertHost(t *testing.T) {
@@ -255,5 +272,50 @@ func TestUpdateTimeStamp(t *testing.T) {
 	}
 	if validate.LastConnection == nil {
 		t.Fatalf("Update of last connection timestamp failed, received nil value")
+	}
+}
+
+func TestRegisterNewIdentityKeyForHost(t *testing.T) {
+	db := NewHostDao(conn)
+	err := db.RegisterNewIdentityKeyForHost("Host_TEST2", "~/.ssh/exampleKey")
+	if err != nil {
+		t.Fatalf("Failed to add key to host, ERROR: %v", err)
+	}
+	updHost, err := db.Get("Host_TEST2")
+	if err != nil {
+		t.Fatalf("Failed to get host after update. Error %v", err)
+	}
+	if updHost.Options[0].Value != "~/.ssh/exampleKey" || updHost.Options[0].Key != "IdentityFile" {
+		t.Fatalf("Update failed to add key correctly to host. Host %v", updHost)
+	}
+}
+
+func TestGetAllKeys(t *testing.T) {
+	db := NewHostDao(conn)
+	db.RegisterNewIdentityKeyForHost("Host_TEST2", "~/.ssh/second")
+	keys, err := db.GetAllHostsIdentityKeys("Host_TEST2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keys[0] != "~/.ssh/exampleKey" || keys[1] != "~/.ssh/second" {
+		t.Fatalf("Keys were not returned as they were expected. Array: %v", keys)
+	}
+}
+
+func TestDeRegisterIdentityKeyFromHost(t *testing.T) {
+	db := NewHostDao(conn)
+	err := db.DeRegisterIdentityKeyFromHost("Host_TEST2", "~/.ssh/second")
+	if err != nil {
+		t.Fatalf("failed to deregister key from host. Error %v", err)
+	}
+	keys, err := db.GetAllHostsIdentityKeys("Host_TEST2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) > 1 {
+		t.Fatalf("should only be 1 key")
+	}
+	if keys[0] == "~/.ssh/second" {
+		t.Fatalf("key should have been removed yet still exists")
 	}
 }

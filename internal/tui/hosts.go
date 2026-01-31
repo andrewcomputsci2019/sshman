@@ -46,41 +46,45 @@ const (
 )
 
 type TableKeyBinds struct {
-	Up        key.Binding
-	Down      key.Binding
-	Left      key.Binding
-	Right     key.Binding
-	Edit      key.Binding
-	Add       key.Binding
-	Delete    key.Binding
-	Select    key.Binding
-	Ping      key.Binding
-	CycleView key.Binding
+	Up          key.Binding
+	Down        key.Binding
+	Left        key.Binding
+	Right       key.Binding
+	Edit        key.Binding
+	Add         key.Binding
+	Delete      key.Binding
+	Select      key.Binding
+	Ping        key.Binding
+	GenerateKey key.Binding
+	RotateKey   key.Binding
+	CycleView   key.Binding
 }
 
 func (t TableKeyBinds) ShortHelp() []key.Binding {
-	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete, t.Select, t.CycleView, t.Ping}
+	return []key.Binding{t.Up, t.Down, t.Left, t.Right, t.Edit, t.Add, t.Delete, t.Select, t.CycleView, t.Ping, t.GenerateKey, t.RotateKey}
 }
 
 func (t TableKeyBinds) FullHelp() [][]key.Binding {
 	binds := make([][]key.Binding, 0)
 	binds = append(binds, []key.Binding{t.Up, t.Down, t.Left, t.Right})
 	binds = append(binds, []key.Binding{t.Edit, t.Add, t.Delete})
-	binds = append(binds, []key.Binding{t.Select, t.CycleView, t.Ping})
+	binds = append(binds, []key.Binding{t.Select, t.CycleView, t.Ping, t.GenerateKey, t.RotateKey})
 	return binds
 }
 
 type InfoViewKeyBinds struct {
-	Up             key.Binding // j
-	Down           key.Binding // k
-	Next           key.Binding // tab
-	Prev           key.Binding // shift tab
-	CollapseToggle key.Binding // alt-c
-	Save           key.Binding // ctrl-s only works in edit mode
-	AddOption      key.Binding // ctrl-a
-	DeleteOption   key.Binding // ctrl-d
-	ChangeView     key.Binding // ctrl-w
-	CancelView     key.Binding // this is like exit and go back to table focus
+	Up                key.Binding // j
+	Down              key.Binding // k
+	Next              key.Binding // tab
+	Prev              key.Binding // shift tab
+	CollapseToggle    key.Binding // alt-c
+	Save              key.Binding // ctrl-s only works in edit mode
+	AddOption         key.Binding // ctrl-a
+	DeleteOption      key.Binding // ctrl-d
+	ChangeView        key.Binding // ctrl-w
+	CancelView        key.Binding // this is like exit and go back to table focus
+	ScrollDownPreview key.Binding
+	ScrollUpPreview   key.Binding
 }
 
 func (i InfoViewKeyBinds) ShortHelp() []key.Binding {
@@ -124,6 +128,14 @@ var tableKeyMap TableKeyBinds = TableKeyBinds{
 		key.WithKeys("p"),
 		key.WithHelp("p", "ping host"),
 	),
+	GenerateKey: key.NewBinding(
+		key.WithKeys("g"),
+		key.WithHelp("g", "generate key"),
+	),
+	RotateKey: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "rotate keys"),
+	),
 	CycleView: key.NewBinding(
 		key.WithKeys("ctrl+w"),
 		key.WithHelp("ctrl+w", "cycle views")),
@@ -143,8 +155,8 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 		key.WithKeys("shift+tab"),
 		key.WithHelp("shift+tab", " prev ")),
 	CollapseToggle: key.NewBinding(
-		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", " collapse ")),
+		key.WithKeys("shift+c"),
+		key.WithHelp("shift+c", " collapse ")),
 	Save: key.NewBinding(
 		key.WithKeys("ctrl+s"),
 		key.WithHelp("ctrl+s", " save ")),
@@ -160,6 +172,14 @@ var infoPanelKeyMap InfoViewKeyBinds = InfoViewKeyBinds{
 	CancelView: key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", " exit/cancel ")),
+	ScrollUpPreview: key.NewBinding(
+		key.WithKeys("ctrl+k"),
+		key.WithHelp("ctrl+k", "scroll preview up"),
+	),
+	ScrollDownPreview: key.NewBinding(
+		key.WithKeys("ctrl+j"),
+		key.WithHelp("ctrl+j", "scroll preview down"),
+	),
 }
 
 type hostPingInfo struct {
@@ -459,7 +479,8 @@ func (h HostsInfoModel) View() string {
 	sections = append(sections, h.renderNotes())
 
 	if h.shouldRenderPreview() {
-		h.previewOptionScrollPane.SetContent(h.HostPreviewString)
+		wrapped := lipgloss.NewStyle().MaxWidth(h.previewOptionScrollPane.Width - 2).Render(h.HostPreviewString)
+		h.previewOptionScrollPane.SetContent(wrapped)
 		sections = append(sections, lipgloss.NewStyle().Bold(true).Render("Preview"))
 		sections = append(sections, h.previewOptionScrollPane.View())
 	}
@@ -505,6 +526,8 @@ func (h *HostsInfoModel) loadHost(host sqlite.Host) {
 	h.hostNotes.SetValue(host.Notes)
 	h.tagsInput.SetValue(strings.Join(host.Tags, ","))
 	h.HostPreviewString = buildHostPreview(host)
+	h.previewOptionScrollPane.SetXOffset(0)
+	h.previewOptionScrollPane.SetYOffset(0)
 	h.setHostOptions(host)
 	h.selected = h.firstEditableIndex()
 	if h.selected < 0 {
@@ -802,10 +825,15 @@ func (h HostsInfoModel) renderOptions() string {
 		valStr := opt.val.Value()
 		if h.mode == infoEditMode && h.selected == idx && !opt.neverEditable {
 			if opt.focusedField == optionFieldKey {
-				keyStr = opt.key.View()
+				keyStr = clampTextWidth(opt.key.View(), opt.key.Width+2)
+				valStr = clampTextWidth(valStr, opt.val.Width-2)
 			} else {
-				valStr = opt.val.View()
+				keyStr = clampTextWidth(keyStr, opt.key.Width-2)
+				valStr = clampTextWidth(opt.val.View(), opt.val.Width+2)
 			}
+		} else {
+			keyStr = clampTextWidth(keyStr, opt.key.Width)
+			valStr = clampTextWidth(valStr, opt.val.Width)
 		}
 		lines[idx] = fmt.Sprintf("%s%s: %s", indicator, keyStr, valStr)
 		if opt.neverEditable {
@@ -813,6 +841,13 @@ func (h HostsInfoModel) renderOptions() string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func clampTextWidth(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	return lipgloss.NewStyle().MaxWidth(width).Inline(true).Render(value)
 }
 
 func (h HostsInfoModel) renderNotes() string {
@@ -823,7 +858,7 @@ func (h HostsInfoModel) renderNotes() string {
 	if value == "" {
 		return "(no notes)"
 	}
-	return value
+	return lipgloss.NewStyle().Width(h.hostNotes.Width()).Render(value)
 }
 
 func (h HostsInfoModel) renderTags() string {
@@ -1004,6 +1039,24 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						ping:          res.Latency,
 					}
 				})
+			case key.Matches(keyMsg, tableKeyMap.GenerateKey) && !h.table.table.GetIsFilterInputFocused():
+				host := h.table.highlightedHost()
+				if host == nil {
+					break
+				}
+				cmds = append(cmds, func() tea.Msg {
+					return startKeyGenerationForm{host.Host}
+				})
+			case key.Matches(keyMsg, tableKeyMap.RotateKey) && !h.table.table.GetIsFilterInputFocused():
+				host := h.table.highlightedHost()
+				if host == nil {
+					break
+				}
+				cmds = append(cmds, func() tea.Msg {
+					return startKeyRotateForm{
+						host: host.Host,
+					}
+				})
 			}
 		} else {
 			switch {
@@ -1011,6 +1064,13 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				h.focus = focusTable
 				h.table.setFocused(true)
 				h.infoPanel.ExitEditMode()
+			case key.Matches(keyMsg, infoPanelKeyMap.ScrollUpPreview):
+				h.infoPanel.previewOptionScrollPane.YOffset--
+				if h.infoPanel.previewOptionScrollPane.YOffset < 0 {
+					h.infoPanel.previewOptionScrollPane.YOffset = 0
+				}
+			case key.Matches(keyMsg, infoPanelKeyMap.ScrollDownPreview):
+				h.infoPanel.previewOptionScrollPane.YOffset = min(len(strings.Split(h.infoPanel.HostPreviewString, "\n"))+1-h.infoPanel.previewOptionScrollPane.Height, h.infoPanel.previewOptionScrollPane.YOffset+1)
 			}
 		}
 	}
@@ -1080,12 +1140,18 @@ func (h *HostsPanelModel) refreshTableRows() {
 }
 
 func (h *HostsPanelModel) syncInfoWithSelection() {
+	h.syncInfoWithSelectionForced(false)
+}
+
+func (h *HostsPanelModel) syncInfoWithSelectionForced(forced bool) {
 	host := h.table.highlightedHost()
 	if host == nil {
 		h.infoPanel.clearHost()
 		return
 	}
 	if host.Host != h.infoPanel.currentEditHost.Host {
+		h.infoPanel.loadHost(*host)
+	} else if forced {
 		h.infoPanel.loadHost(*host)
 	}
 }
@@ -1100,7 +1166,7 @@ func (h HostsPanelModel) upsertHost(host sqlite.Host) HostsPanelModel {
 		h.data = append(h.data, host)
 	}
 	h.refreshTableRows()
-	h.syncInfoWithSelection()
+	h.syncInfoWithSelectionForced(true)
 	return h
 }
 
@@ -1120,6 +1186,19 @@ func (h *HostsPanelModel) updatePingMap(p pingResult) {
 	}
 	info.ping = formatDurationCompact(p.ping)
 	h.pingMap[p.host] = info
+}
+
+func (h *HostsPanelModel) updateLastConnection(host string, connectionTimeStamp time.Time) {
+	idx := slices.IndexFunc(h.data, func(existing sqlite.Host) bool {
+		return existing.Host == host
+	})
+	if idx == -1 {
+		return
+	}
+	tmp := new(time.Time)
+	*tmp = connectionTimeStamp
+	h.data[idx].LastConnection = tmp
+	h.refreshTableRows()
 }
 
 type connectHostMessage struct {
@@ -1239,16 +1318,19 @@ func buildHostPreview(host sqlite.Host) string {
 	for _, opt := range opts {
 		builder.WriteString(fmt.Sprintf("  %s %s\n", opt.Key, opt.Value))
 	}
-	// dont include tags when constructing preview string
+	// do not include tags when constructing preview string
 	// if len(host.Tags) > 0 {
 	// 	builder.WriteString("Tags: ")
 	// 	builder.WriteString(strings.Join(host.Tags, ","))
 	// 	builder.WriteRune('\n')
 	// }
-	if note := strings.TrimSpace(host.Notes); note != "" {
-		builder.WriteString("# ")
-		builder.WriteString(note)
-		builder.WriteRune('\n')
+	for _, notes := range strings.Split(host.Notes, "\n") {
+		if strings.TrimSpace(notes) == "" {
+			continue
+		}
+		builder.WriteString("#")
+		builder.WriteString(strings.TrimSpace(notes))
+		builder.WriteString("\n")
 	}
 	return strings.TrimRight(builder.String(), "\n")
 }

@@ -131,6 +131,20 @@ func (conn *Connection) execute(insert string, args ...any) error {
 	return nil
 }
 
+func (conn *Connection) executeWithResultFunc(insert string, res func(stmt *sqlite.Stmt) error, args ...any) error {
+	if conn == nil {
+		return fmt.Errorf("sqlite connection is nil")
+	}
+	err := sqlitex.Execute(conn.conn, insert, &sqlitex.ExecOptions{
+		Args:       args,
+		ResultFunc: res,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (conn *Connection) executeNamed(insert string, names map[string]any, args ...any) error {
 	if conn == nil {
 		return fmt.Errorf("sqlite connection is nil")

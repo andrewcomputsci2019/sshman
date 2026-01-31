@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -34,6 +35,7 @@ var KeyGenTypeSet = map[string]struct{}{
 }
 
 type Config struct {
+	DevMode     bool
 	StorageConf StorageConfig `yaml:"storage_config"`
 	Ssh         SSH           `yaml:"ssh"`
 	EnablePing  bool          `yaml:"enable_ping"` // trys to ping host to see if they are up and reports their ping
@@ -50,6 +52,7 @@ type SSH struct {
 	KeyOnly                    bool     `yaml:"key_only,omitempty"`
 	KeyPath                    string   `yaml:"key_path,omitempty"`                  // where to store generated keys
 	AcceptableKeyGenAlgorithms []string `yaml:"acceptable_key_algorithms,omitempty"` // Note this will reject DSA if provided
+	RemovePubKeyAfterGen       bool     `yaml:"remove_pub_after_gen,omitempty"`
 }
 
 func (cfg *Config) String() string {
@@ -118,5 +121,8 @@ func (cfg *Config) String() string {
 }
 
 func (c Config) GetSshConfigFilePath() string {
+	if c.DevMode {
+		return filepath.Join(os.TempDir(), "ssh_man_dev_config")
+	}
 	return filepath.Join(xdg.ConfigHome, DefaultAppStorePath, SshConfigPath)
 }
