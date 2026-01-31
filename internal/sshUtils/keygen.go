@@ -273,7 +273,7 @@ func CopyKey(keyToCopy, host string, cfg config.Config, options ...string) *exec
 	configFilePath := cfg.GetSshConfigFilePath()
 	args := []string{
 		"-F", configFilePath,
-		"i", keyToCopy,
+		"-i", keyToCopy,
 	}
 	args = append(args, options...)
 	args = append(args, host)
