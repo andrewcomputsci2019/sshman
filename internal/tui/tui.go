@@ -209,9 +209,22 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		err := a.db.Delete(sqlite.Host{Host: msg.host})
 		if err != nil {
 			slog.Error("Failed to delete host from db", "Host", msg.host)
+			return a, nil
 		}
 		a.header.numberOfHost--
 		// todo update ssh config file if write through enable and set pending write to true otherwise
+		hosts, err := a.db.GetAll()
+		if err != nil {
+			slog.Error("Failed to get all host after db modification")
+			return a, nil
+		}
+		if getWriteThroughOption(a.cfg.StorageConf.WriteThrough) {
+			sshParser.SerializeHostToFile(a.cfg.GetSshConfigFilePath(), hosts)
+		} else {
+			a.pendingWrite = true
+		}
+		a.hostsModel.data = hosts
+		a.hostsModel.refreshTableRows()
 		return a, nil
 	case newHostsMessage:
 		// todo insert new host and then get updated table
@@ -511,7 +524,15 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						newKeyPair: msg.newKeySet,
 					}
 				})
-
+			updHost, err := a.db.Get(msg.host)
+			if err != nil {
+				slog.Warn("Failed to fetch updated host after key addition in key rotation")
+			} else {
+				m, _ := a.hostsModel.Update(updateHostsMessage{
+					host: updHost,
+				})
+				a.hostsModel = m.(HostsPanelModel)
+			}
 			a.rotateCopyModal.cmd = cmd
 			return a, nil
 		}
@@ -575,6 +596,15 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			slog.Warn("failed to delete key registered to host from database", "error", err, "host", msg.host, "key", msg.oldKey)
 			a.rotateResultModal.message = "New key was uploaded to server but failed to remove old one from database, error: " + err.Error()
 			return a, nil
+		}
+		host, err := a.db.Get(msg.host)
+		if err != nil {
+			slog.Warn("tui will be out of date with sqlite backend")
+		} else {
+			m, _ := a.hostsModel.Update(updateHostsMessage{
+				host: host,
+			})
+			a.hostsModel = m.(HostsPanelModel)
 		}
 		if msg.keyWasRemoved {
 			err = os.Remove(msg.oldKey)
