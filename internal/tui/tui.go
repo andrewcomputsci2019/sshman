@@ -492,13 +492,24 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// enter to accept
 		// esc to cancel
 		// if the user exit here don't remove the old key from the host
-
 		a.rotateCopyModal = newRotateCopyModal(msg)
 		if msg.err == nil {
 			err := a.db.RegisterNewIdentityKeyForHost(msg.host, msg.newKeySet.PrivateKey)
 			if err != nil {
 				a.rotateCopyModal.err = err
 				return a, nil
+			}
+			hosts, err := a.db.GetAll()
+			if err != nil {
+				slog.Warn("Failed to write config file with updated information")
+			} else {
+				if sshParser.SerializeHostToFile(a.cfg.GetSshConfigFilePath(), hosts) != nil {
+					slog.Warn("failed to write config file")
+				} else {
+					a.pendingWrite = false
+					a.hostsModel.data = hosts
+					a.hostsModel.refreshTableRows()
+				}
 			}
 			cmd := tea.ExecProcess(sshUtils.CopyKey(msg.newKeySet.PubKey, msg.host, a.cfg, a.sshOpts...),
 				func(err error) tea.Msg {
