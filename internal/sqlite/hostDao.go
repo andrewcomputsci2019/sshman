@@ -570,6 +570,14 @@ func (dao *HostDao) RegisterNewIdentityKeyForHost(host, keyPath string) error {
 
 func (dao *HostDao) DeRegisterIdentityKeyFromHost(host, keyPath string) error {
 	removalString := `DELETE from host_options where host = ? and key = 'IdentityFile' and value = ?`
-	err := dao.conn.execute(removalString, host, keyPath)
+	rowsChangedCheck := func(stmt *sqlite.Stmt) error {
+
+		if dao.conn.conn.Changes() < 1 {
+			return fmt.Errorf("Could not delete %s host from table", host)
+		}
+
+		return nil
+	}
+	err := dao.conn.executeWithResultFunc(removalString, rowsChangedCheck, host, keyPath)
 	return err
 }
