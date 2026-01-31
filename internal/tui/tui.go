@@ -301,6 +301,17 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type == tea.KeyCtrlC {
 			if a.pendingWrite {
 				// todo serialize host config file
+				hosts, err := a.db.GetAll()
+				if err != nil {
+					slog.Error("Failed to write config file after database change, recommend to run a serialization dump")
+				} else {
+					err := sshParser.SerializeHostToFile(a.cfg.GetSshConfigFilePath(), hosts)
+					if err != nil {
+						slog.Error("Failed to write config file after database change, recommend to run a serialization dump")
+					} else {
+						a.pendingWrite = false
+					}
+				}
 			}
 			return a, tea.Quit
 		}
@@ -627,6 +638,15 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			a.rotateResultModal.message = fmt.Sprintf("New Key %s was uploaded\nOld Key %s was not removed from remote", filepath.Base(msg.newKeyPair.PubKey), filepath.Base(msg.oldKey))
+		}
+		hosts, err := a.db.GetAll()
+		if err != nil {
+			if sshParser.SerializeHostToFile(a.cfg.GetSshConfigFilePath(), hosts) != nil {
+				slog.Warn("Failed to update config file after database change in remove key result")
+				a.pendingWrite = true
+			} else {
+				a.pendingWrite = false
+			}
 		}
 		return a, nil
 	default:
