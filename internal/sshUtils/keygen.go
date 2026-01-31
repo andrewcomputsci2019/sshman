@@ -272,6 +272,7 @@ func getKeyComment(keyPath string, cleanedHost string) (string, error) {
 func CopyKey(keyToCopy, host string, cfg config.Config, options ...string) *exec.Cmd {
 	configFilePath := cfg.GetSshConfigFilePath()
 	args := []string{
+		"-f",
 		"-F", configFilePath,
 		"-i", keyToCopy,
 	}
