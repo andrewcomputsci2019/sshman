@@ -410,7 +410,7 @@ func (w WizardViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				options := make([]sqlite.HostOptions, 0)
 				options = append(options, sqlite.HostOptions{
 					ID:    0,
-					Key:   "Hostname",
+					Key:   "HostName",
 					Value: w.hostnameInput.Value(),
 					Host:  host,
 				})

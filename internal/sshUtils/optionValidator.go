@@ -13,7 +13,7 @@ import (
 )
 
 var validOptionsToBeSet = map[string]struct{}{
-	"Hostname":                     {},
+	"HostName":                     {},
 	"Port":                         {},
 	"User":                         {},
 	"IdentityFile":                 {},

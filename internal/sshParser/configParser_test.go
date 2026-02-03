@@ -74,7 +74,7 @@ Host staging.example.com
 		t.Fatalf("expected host staging.example.com, got %q", hosts[1].Host)
 	}
 
-	if hosts[1].Options[1].Key != "Hostname" || hosts[1].Options[1].Value != "tester.local" {
+	if hosts[1].Options[1].Key != "HostName" || hosts[1].Options[1].Value != "tester.local" {
 		t.Fatalf("Parsed values are not correct")
 	}
 

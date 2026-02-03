@@ -1016,7 +1016,7 @@ func (h HostsPanelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 				cmds = append(cmds, func() tea.Msg {
-					hostname := hostOptionValue(host, "Hostname")
+					hostname := hostOptionValue(host, "HostName")
 					if hostname == "" {
 						hostname = host.Host
 					}
@@ -1208,7 +1208,7 @@ type connectHostMessage struct {
 func hostToRow(host *sqlite.Host, cfg config.Config, pingMap map[string]hostPingInfo) table.Row {
 	row := table.NewRow(table.RowData{
 		hostColumnKey:              host.Host,
-		hostHostnameColumnKey:      hostOptionValue(host, "Hostname"),
+		hostHostnameColumnKey:      hostOptionValue(host, "HostName"),
 		hostTagColumnKey:           strings.Join(host.Tags, ","),
 		hostLastConnectedColumnKey: formatLastConnected(host.LastConnection),
 		hostPingColumnKey:          formatPing(cfg.EnablePing, host.Host, pingMap),

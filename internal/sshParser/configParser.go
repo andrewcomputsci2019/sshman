@@ -91,6 +91,9 @@ func ReadConfig(file string) ([]sqlite.Host, error) {
 				// parse key value pair
 				opt := sqlite.HostOptions{}
 				opt.Host = ""
+				if strings.ToLower(bType.Key) == "hostname" {
+					bType.Key = "HostName"
+				}
 				opt.Key = bType.Key
 				opt.Value = bType.Value
 				options = append(options, opt)
