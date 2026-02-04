@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
+	"github.com/goccy/go-yaml"
 )
 
 // InitProjectStructure creates all necessary data directories need for the program to function correctly
@@ -22,6 +23,23 @@ func InitProjectStructure() error {
 	}
 	err = createSshConfigDirIfNotExist()
 	if err != nil {
+		return err
+	}
+	// todo dump default config into file
+	cfg := config.GetDefaultConfig()
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		slog.Error("Failed to generate yaml definition", "error", err)
+	}
+	cfgPath := filepath.Join(xdg.ConfigHome, config.DefaultAppConfigPath)
+	cfgFile, err := os.OpenFile(cfgPath, os.O_CREATE|os.O_RDWR, 0760)
+	if err != nil {
+		slog.Error("failed to create config file", "Path", cfgPath, "error", err)
+		return err
+	}
+	_, err = cfgFile.Write(data)
+	if err != nil {
+		slog.Error("Failed to write to config file", "Path", cfgPath, "error", err)
 		return err
 	}
 	return nil

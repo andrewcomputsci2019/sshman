@@ -126,3 +126,17 @@ func (c Config) GetSshConfigFilePath() string {
 	}
 	return filepath.Join(xdg.ConfigHome, DefaultAppStorePath, SshConfigPath)
 }
+
+func GetDefaultConfig() Config {
+
+	return Config{
+		EnablePing: true,
+		Ssh: SSH{
+			AcceptableKeyGenAlgorithms: []string{RSA, ECDSA, ED25519},
+			RemovePubKeyAfterGen:       false,
+		},
+		StorageConf: StorageConfig{
+			ConflictPolicy: string(ConflictAlwaysError),
+		},
+	}
+}
