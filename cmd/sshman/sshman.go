@@ -6,16 +6,24 @@ import (
 	"andrew/sshman/internal/flags"
 	"andrew/sshman/internal/sqlite"
 	"andrew/sshman/internal/sshParser"
+	"andrew/sshman/internal/sshUtils"
+	"andrew/sshman/internal/tui"
 	"andrew/sshman/internal/utils"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/adrg/xdg"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type optionFlags []string
@@ -25,9 +33,16 @@ func (o *optionFlags) String() string {
 }
 
 func (o *optionFlags) Set(value string) error {
-	*o = append(*o, value)
+	*o = append(*o, strings.TrimSpace(value))
 	return nil
 }
+
+type noopHandler struct{}
+
+func (h *noopHandler) Enabled(_ context.Context, level slog.Level) bool   { return false }
+func (h *noopHandler) Handle(_ context.Context, record slog.Record) error { return nil }
+func (h *noopHandler) WithAttrs(attrs []slog.Attr) slog.Handler           { return h }
+func (h *noopHandler) WithGroup(name string) slog.Handler                 { return h }
 
 func main() {
 	// log level setting
@@ -51,16 +66,20 @@ func main() {
 
 	// run config parameter flags
 	host := flags.NewStringSettableFlag("h", "", "host alias")
+	// used for quickadd and quickedit
 	hostname := flags.NewStringSettableFlag("hostname", "", "new hostname for given host alias")
+	// these are only used for quick connect
 	port := flags.NewUintSettableFlag("p", 22, "ssh port")
 	identityFile := flags.NewStringSettableFlag("i", "", "identity file")
+	// used for both quick connect and quick sync
 	sshConfigFile := flags.NewStringSettableFlag("f", "", "ssh config file")
-	forceSync := flag.Bool("fs", false, "force sync, ignores checksum and attempts to sync database with provided config file")
 
+	forceSync := flag.Bool("fs", false, "force sync, ignores checksum and attempts to sync database with provided config file")
+	// these are forwarded to the tui
 	var sshConfigOptions optionFlags
 	flag.Var(&sshConfigOptions, "o",
 		"option flags, these are ssh options that you want passed, works for quick commands such as qe, and qa, in tui, "+
-			"these are passed when invoking ssh, these should be passed identically to how they are written in a config file")
+			"these are passed when invoking ssh, these should be passed as -o Key=Value")
 	flag.Parse()
 	if logLevel != nil && *logLevel != "None" {
 		// set up slog here
@@ -100,6 +119,8 @@ func main() {
 				Level: slog.LevelInfo,
 			})))
 		}
+	} else { // discard log message
+		slog.SetDefault(slog.New(&noopHandler{}))
 	}
 
 	if *versionFlag {
@@ -150,7 +171,7 @@ func main() {
 		dbAO = sqlite.NewHostDao(conn)
 	} else {
 		// use default path
-		storagePath := path.Join(xdg.DataHome, config.DefaultAppStorePath, config.DatabaseDir)
+		storagePath := filepath.Join(xdg.DataHome, config.DefaultAppStorePath, config.DatabaseDir)
 		conn, err := sqlite.CreateAndLoadDB(storagePath)
 		if err != nil {
 			slog.Error("Error loading storage", "error", err, "path", storagePath)
@@ -175,10 +196,43 @@ func main() {
 			slog.Error("port provided is invalid", "port", port)
 			os.Exit(1)
 		}
-		_ = port
-		_ = host
-		_ = identityFile
 
+		_, err := dbAO.Get(host.Value)
+		if !sshConfigFile.SetByUser && err != nil {
+			slog.Error("Host does not exist in table exiting", "host", host.Value)
+			os.Exit(1)
+		}
+		var configPath string
+		if sshConfigFile.SetByUser {
+			configPath = sshConfigFile.Value
+		} else {
+			configPath = cfg.GetSshConfigFilePath()
+		}
+
+		// compile options together
+		options := make([]string, 0)
+		if port.SetByUser {
+			options = append(options, "-p")
+			options = append(options, strconv.FormatUint(uint64(port.Value), 10))
+		}
+		if identityFile.SetByUser {
+			options = append(options, "-i")
+			options = append(options, identityFile.Value)
+		}
+		if sshConfigFile.SetByUser {
+			options = append(options, "-F")
+			options = append(options, sshConfigFile.Value)
+		}
+		for _, opt := range sshConfigOptions {
+			options = append(options, "-o")
+			options = append(options, opt)
+		}
+		cmd := createSSHCommand(host.Value, cfg.Ssh.ExcPath, configPath, options...)
+		// slave current tty to cmd
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Run()
 		os.Exit(0)
 	}
 
@@ -255,34 +309,161 @@ func main() {
 		// handle quick edit here
 		if !host.SetByUser {
 			_, _ = fmt.Fprintf(os.Stderr, "You must set host when using quick Edit\n")
+			return
 		}
 		// check for host existence in database
 		dbHost, err := dbAO.Get(host.Value)
 		if err != nil {
 			slog.Error("Error getting host", "error", err)
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to get host, please verify host is valid\n")
+			os.Exit(1)
 		}
 		//convert hostOpts to a map of host-ops, note its a list due to a couple of options that can muti values
 		optMap := make(map[string][]sqlite.HostOptions)
+		for _, opt := range dbHost.Options {
+			// iterate over option and plug into the map
+			optMap[opt.Key] = append(optMap[opt.Key], opt)
+		}
 		if hostname.SetByUser {
-
+			optMap["HostName"][0] = sqlite.HostOptions{
+				Host:  dbHost.Host,
+				Key:   "HostName",
+				Value: hostname.Value,
+			}
+		}
+		for _, option := range sshConfigOptions {
+			split := strings.Split(option, "=")
+			key, value := strings.TrimSpace(split[0]), strings.TrimSpace(split[1])
+			if !sshUtils.IsAcceptableOption(key) {
+				slog.Warn("Skipping unknown option from user provided list", "key", key)
+				continue
+			}
+			if sshUtils.IsOptionYesNo(key) && !sshUtils.YesNoOptionValid(strings.ToLower(value)) {
+				slog.Warn("Skipping config option as it was detected as a ssh yes no option yet was not provided a valid yes no value", "key", key, "value", value)
+				continue
+			}
+			if sshUtils.IsOptionYesNo(key) {
+				value = strings.ToLower(value)
+			}
+			if _, ok := optMap[key]; ok {
+				if sshUtils.OptionIsOfMutiType(key) {
+					optMap[key] = append(optMap[key], sqlite.HostOptions{
+						Host:  dbHost.Host,
+						Key:   key,
+						Value: value,
+					})
+				} else {
+					optMap[key][0] = sqlite.HostOptions{
+						Host:  dbHost.Host,
+						Key:   key,
+						Value: value,
+					}
+				}
+			} else {
+				optMap[key] = append(optMap[key], sqlite.HostOptions{
+					Host:  dbHost.Host,
+					Key:   key,
+					Value: value,
+				})
+			}
 		}
 
 		os.Exit(0)
 	}
 	if *quickAdd {
 		// handle quick add here
-
+		if !host.SetByUser {
+			_, _ = fmt.Fprint(os.Stderr, "Host must be set when adding a host")
+			os.Exit(1)
+		}
+		if !hostname.SetByUser {
+			_, _ = fmt.Fprint(os.Stderr, "HostName must be set when adding a host")
+			os.Exit(1)
+		}
+		hOptions := make([]sqlite.HostOptions, 0)
+		for _, option := range sshConfigOptions {
+			split := strings.Split(option, "=")
+			key, value := strings.TrimSpace(split[0]), strings.TrimSpace(split[1])
+			if !sshUtils.IsAcceptableOption(key) {
+				slog.Warn("Skipping unknown option from user provided list", "key", key)
+				continue
+			}
+			if sshUtils.IsOptionYesNo(key) && !sshUtils.YesNoOptionValid(strings.ToLower(value)) {
+				slog.Warn("Skipping config option as it was detected as a ssh yes no option yet was not provided a valid yes no value", "key", key, "value", value)
+				continue
+			}
+			if sshUtils.IsOptionYesNo(key) {
+				value = strings.ToLower(value)
+			}
+			hOptions = append(hOptions, sqlite.HostOptions{
+				Host:  host.Value,
+				Key:   key,
+				Value: value,
+			})
+		}
+		sqHost := sqlite.Host{
+			Host:      host.Value,
+			CreatedAt: time.Now(),
+			Notes:     "",
+			Options:   hOptions,
+		}
+		err := dbAO.Insert(sqHost)
+		if err != nil {
+			slog.Error("Failed to add host to host table", "error", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 	if *quickDelete {
 		// handle quick delete here
-
+		if !host.SetByUser {
+			_, _ = fmt.Fprint(os.Stderr, "Host needs to be set when using quick delete")
+			os.Exit(1)
+		}
+		err := dbAO.Delete(sqlite.Host{
+			Host: host.Value,
+		})
+		if err != nil {
+			slog.Warn("Failed to delete host from table, or host does not exist in the table", "error", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
 	/*
 		OtherWise start tui
 	*/
+	hosts, err := dbAO.GetAll()
+	if err != nil {
+		slog.Error("Failed to fetch all hosts during startup")
+		_, _ = fmt.Fprint(os.Stderr, "Failed to fetch all hosts during startup")
+		return
+	}
+	prefixedOptions := make([]string, 0)
+	for _, opt := range sshConfigOptions {
+		prefixedOptions = append(prefixedOptions, "-o")
+		prefixedOptions = append(prefixedOptions, opt)
+	}
+	app := tui.NewAppModel(hosts, dbAO, cfg, prefixedOptions...)
+	program := tea.NewProgram(app, tea.WithAltScreen())
+	if _, err := program.Run(); err != nil {
+		fmt.Printf("err: %s", err)
+	}
+}
 
+func createSSHCommand(host string, sshPath string, configPath string, options ...string) *exec.Cmd {
+	// note options need to be passed with a prefix of -o
+	var c *exec.Cmd
+	if sshPath == "" {
+		args := []string{"-F", configPath}
+		args = append(args, options...)
+		args = append(args, host)
+		c = exec.Command("ssh", args...)
+	} else {
+		args := []string{"-F", configPath}
+		args = append(args, options...)
+		args = append(args, host)
+		c = exec.Command(sshPath, args...)
+	}
+	return c
 }
