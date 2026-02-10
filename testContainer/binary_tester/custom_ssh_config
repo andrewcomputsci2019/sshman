@@ -1,0 +1,5 @@
+Host dev-test
+    HostName localhost
+    Port 2222
+    User test
+# this is an example config from an exist ssh config file

@@ -1,0 +1,18 @@
+services:
+  ssh-man-test-runner:
+    build:
+      context: ../
+      dockerfile: testContainer/binary_tester/Dockerfile
+    environment:
+      TEST_SSH_HOST: "localhost"
+      TEST_SSH_PORT: "2222"
+      TEST_SSH_USER: "test"
+      TEST_SSH_PASS: "password"
+    network_mode: host
+  ssh-server:
+    build:
+      context: .
+      dockerfile: ssh_runner/Dockerfile
+    ports:
+      - 2222
+  
