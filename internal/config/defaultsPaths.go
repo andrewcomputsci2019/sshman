@@ -12,4 +12,5 @@ const (
 	KeyStoreDir   = "ssh/keystore"
 	SshConfigPath = "ssh/config"
 	DatabaseDir   = "db"
+	DatabaseName  = "hosts.db"
 )

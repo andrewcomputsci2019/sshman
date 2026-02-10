@@ -11,6 +11,10 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+const (
+	checksums = "checksums"
+)
+
 // InitProjectStructure creates all necessary data directories need for the program to function correctly
 func InitProjectStructure() error {
 	err := createKeyStorageIfNotExist()
@@ -25,6 +29,7 @@ func InitProjectStructure() error {
 	if err != nil {
 		return err
 	}
+	err = createSQLiteDataStorePath()
 	// todo dump default config into file
 	cfg := config.GetDefaultConfig()
 	data, err := yaml.Marshal(cfg)
@@ -47,12 +52,12 @@ func InitProjectStructure() error {
 
 // todo test init function and verify that it correctly creates necessary program directories
 
-// createKeyStorageIfNotExist creates the dir of $XDG_DATA_HOME/ssh_man/keystore
+// createKeyStorageIfNotExist creates the dir of $XDG_CONFIG_HOME/ssh_man/ssh/keystore
 func createKeyStorageIfNotExist() error {
-	checkSumPath := filepath.Join(xdg.ConfigHome, config.AppName, config.KeyStoreDir)
-	err := os.MkdirAll(checkSumPath, 0760)
+	keystoreDir := filepath.Join(xdg.ConfigHome, config.AppName, config.KeyStoreDir)
+	err := os.MkdirAll(keystoreDir, 0760)
 	if err != nil {
-		slog.Error("Failed to create keystore directory", "path", checkSumPath, "error", err)
+		slog.Error("Failed to create keystore directory", "path", keystoreDir, "error", err)
 		return err
 	}
 	return nil
@@ -60,7 +65,7 @@ func createKeyStorageIfNotExist() error {
 
 // createChecksumDirIfNotExist creates the dir of $XDG_DATA_HOME/ssh_man/checksums/
 func createChecksumDirIfNotExist() error {
-	checkSumPath := filepath.Join(xdg.DataHome, config.AppName, "checksums")
+	checkSumPath := filepath.Join(xdg.DataHome, config.AppName, checksums)
 	err := os.MkdirAll(checkSumPath, 0760)
 	if err != nil {
 		slog.Error("Failed to create checksums directory", "path", checkSumPath, "error", err)
@@ -75,6 +80,16 @@ func createSshConfigDirIfNotExist() error {
 	err := os.MkdirAll(filepath.Dir(configPath), 0760)
 	if err != nil {
 		slog.Error("Failed to create ssh config dir", "path", configPath, "error", err)
+		return err
+	}
+	return nil
+}
+
+func createSQLiteDataStorePath() error {
+	filePath := filepath.Join(xdg.DataHome, config.DefaultAppStorePath, config.DatabaseDir, config.DatabaseName)
+	err := os.MkdirAll(filepath.Dir(filePath), 0760)
+	if err != nil {
+		slog.Error("Failed to create database storage directory", "path", filePath, "error", err)
 		return err
 	}
 	return nil
