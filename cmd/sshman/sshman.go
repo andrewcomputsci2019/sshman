@@ -61,7 +61,7 @@ func main() {
 	// get host relies on user setting host alias flag
 	getHost := flag.Bool("gh", false, "get a host config definition and print it")
 	createConfigFlag := flag.Bool("cc", false, "create ssh config using sqlite database")
-
+	_ = flag.Bool("update", false, "checks for an available update, on unix may prompt for auto update")
 	// validate config flag
 	validateConfig := flag.Bool("validate", false, "validate configuration")
 	printConfig := flag.Bool("parse-config", false, "print configuration")
