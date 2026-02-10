@@ -227,3 +227,11 @@ func SerializeHostToFile(file string, hosts []sqlite.Host) error {
 	}
 	return nil
 }
+
+func ConvertSQLiteHostToString(host *sqlite.Host) (string, error) {
+	def, err := serializeHostToSshHost(host)
+	if err != nil {
+		return "", err
+	}
+	return def.String(), nil
+}
