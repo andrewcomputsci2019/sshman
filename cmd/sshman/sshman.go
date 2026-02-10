@@ -49,13 +49,18 @@ func main() {
 	logLevel := flag.String("log", "None", "logging level, [Debug, Info, Warning, Error]")
 	logFile := flag.Bool("logFile", true, "set output of logger to log file instead of terminal")
 	// first run flag -- init
-	init := flag.Bool("init", false, "initialize sshman")
+	init := flag.Bool("init", false, "initialize ssh-man")
 	// quick action commands
 	quickAdd := flag.Bool("qa", false, "quick add")
 	quickDelete := flag.Bool("qd", false, "quick delete")
 	quickEdit := flag.Bool("qe", false, "quick edit")
 	quickConnect := flag.Bool("qc", false, "quick connect")
 	quickSync := flag.Bool("qs", false, "quick sync")
+
+	// debug flags
+	// get host relies on user setting host alias flag
+	getHost := flag.Bool("gh", false, "get a host config definition and print it")
+	createConfigFlag := flag.Bool("cc", false, "create ssh config using sqlite database")
 
 	// validate config flag
 	validateConfig := flag.Bool("validate", false, "validate configuration")
@@ -65,7 +70,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "print version and exit")
 
 	// run config parameter flags
-	host := flags.NewStringSettableFlag("h", "", "host alias")
+	host := flags.NewStringSettableFlag("host", "", "host alias")
 	// used for quickadd and quickedit
 	hostname := flags.NewStringSettableFlag("hostname", "", "new hostname for given host alias")
 	// these are only used for quick connect
@@ -114,7 +119,7 @@ func main() {
 				Level: slog.LevelError,
 			})))
 		default:
-			_, _ = fmt.Fprintf(os.Stderr, "unkown log level: %s, defualting to info\n", *logLevel)
+			_, _ = fmt.Fprintf(os.Stderr, "unknown log level: %s, defaulting to info\n", *logLevel)
 			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelInfo,
 			})))
@@ -127,7 +132,7 @@ func main() {
 		fmt.Printf("ssh-man:\n\tversion: %v\n\tbuild date: %v\n\tbuild os: %v\n\tbuild architecture: %v\n",
 			fmt.Sprintf("%v.%v.%v", buildInfo.BuildMajor, buildInfo.BuildMinor, buildInfo.BuildPatch),
 			buildInfo.BuildDate, buildInfo.BUILD_OS, buildInfo.BUILD_ARC)
-		os.Exit(0)
+		return
 	}
 
 	if *init {
@@ -137,7 +142,7 @@ func main() {
 			slog.Error("Failed to initialize project structure", "error", err)
 			os.Exit(1)
 		}
-		os.Exit(0)
+		return
 	}
 
 	/*
@@ -151,12 +156,13 @@ func main() {
 	}
 
 	if *validateConfig {
-		os.Exit(0)
+		return
 	}
 	if *printConfig {
 		config.PrintConfig(cfg)
-		os.Exit(0)
+		return
 	}
+	var closeResource func() // db conn closure function
 	/*
 		LoadDatabase here
 	*/
@@ -169,9 +175,12 @@ func main() {
 			os.Exit(1)
 		}
 		dbAO = sqlite.NewHostDao(conn)
+		closeResource = func() {
+			conn.Close()
+		}
 	} else {
 		// use default path
-		storagePath := filepath.Join(xdg.DataHome, config.DefaultAppStorePath, config.DatabaseDir)
+		storagePath := filepath.Join(xdg.DataHome, config.DefaultAppStorePath, config.DatabaseDir, config.DatabaseName)
 		conn, err := sqlite.CreateAndLoadDB(storagePath)
 		if err != nil {
 			slog.Error("Error loading storage", "error", err, "path", storagePath)
@@ -179,6 +188,44 @@ func main() {
 			os.Exit(1)
 		}
 		dbAO = sqlite.NewHostDao(conn)
+		closeResource = func() {
+			conn.Close()
+		}
+	}
+	defer closeResource()
+	if *getHost {
+		if !host.SetByUser {
+			slog.Error("host must be set in order to print stored definition")
+			_, _ = fmt.Fprintf(os.Stderr, "You must set host when getting stored definition")
+			// make sure to close database object
+			closeResource()
+			os.Exit(1)
+		}
+		storedHost, err := dbAO.Get(host.Value)
+		if err != nil {
+			slog.Error("error getting host from database", "host", host.Value, "error", err)
+			_, _ = fmt.Fprintf(os.Stderr, "Error getting host from database")
+			closeResource()
+			os.Exit(1)
+		}
+		fmt.Printf("Database compliant definition: %v\n", storedHost)
+		hStr, err := sshParser.ConvertSQLiteHostToString(&storedHost)
+		if err != nil {
+			slog.Error("Failed to convert host into ssh compliant string", "error", err)
+			closeResource()
+			os.Exit(1)
+		}
+		fmt.Printf("SSH Config compliant definition: %v\n", hStr)
+		return
+	}
+
+	if *createConfigFlag {
+		if createSSHConfigFile(dbAO, cfg.GetSshConfigFilePath()) != nil {
+			slog.Error("could not write ssh config file out")
+			_, _ = fmt.Fprint(os.Stderr, "Failed to write ssh config file out\n")
+			closeResource()
+			os.Exit(1)
+		}
 	}
 
 	/*
@@ -189,17 +236,20 @@ func main() {
 		if !host.SetByUser {
 			_, _ = fmt.Fprintf(os.Stderr, "You must set host when using quick connect\n")
 			slog.Error("host not set in quick connect")
+			closeResource()
 			os.Exit(1)
 		}
 		if port.SetByUser && port.Value == 0 {
-			_, _ = fmt.Fprintf(os.Stderr, "Proivded port number: %v, is not valid\n", port.Value)
+			_, _ = fmt.Fprintf(os.Stderr, "Provided port number: %v, is not valid\n", port.Value)
 			slog.Error("port provided is invalid", "port", port)
+			closeResource()
 			os.Exit(1)
 		}
 
 		_, err := dbAO.Get(host.Value)
 		if !sshConfigFile.SetByUser && err != nil {
 			slog.Error("Host does not exist in table exiting", "host", host.Value)
+			closeResource()
 			os.Exit(1)
 		}
 		var configPath string
@@ -233,12 +283,13 @@ func main() {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Run()
-		os.Exit(0)
+		return
 	}
 
 	if *quickSync {
 		if !sshConfigFile.SetByUser {
-			_, _ = fmt.Fprintf(os.Stderr, "You must speficy a config file to sync against if using quickSync\n")
+			_, _ = fmt.Fprintf(os.Stderr, "You must specify a config file to sync against if using quickSync\n")
+			closeResource()
 			os.Exit(1)
 		}
 		filePath := sshConfigFile.String()
@@ -249,18 +300,20 @@ func main() {
 		isSame, err := sshParser.IsSame(filePath)
 		if err != nil {
 			slog.Error("Error getting checksum of config file", "error", err)
-			_, _ = fmt.Fprintf(os.Stderr, "Verfiy config file exist and is readable by current login user\nFile given: %s\nerr: %v", filePath, err)
+			_, _ = fmt.Fprintf(os.Stderr, "Verify config file exist and is readable by current login user\nFile given: %s\nerr: %v", filePath, err)
+			closeResource()
 			os.Exit(1)
 		}
 
 		if isSame {
 			slog.Info("Config file already has been synced before, skipping")
-			os.Exit(0)
+			return
 		}
 
 		hostsFromConfig, err := sshParser.ReadConfig(filePath) // get host defs from config
 		if err != nil {
 			slog.Error("Error reading config file", "error", err)
+			closeResource()
 			os.Exit(1)
 		}
 
@@ -271,6 +324,7 @@ func main() {
 			if err != nil {
 				slog.Error("failed to sync host into database", "error", err)
 				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database, please see error %v.\n", err)
+				closeResource()
 				os.Exit(1)
 			}
 		case string(config.ConflictIgnore):
@@ -278,6 +332,7 @@ func main() {
 			if err != nil {
 				slog.Error("failed to sync host into database due to internal error", "error", err)
 				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database due to internal error, please see error and try again: %v.\n", err)
+				closeResource()
 				os.Exit(1)
 			}
 		case string(config.ConflictFavorConfig):
@@ -286,6 +341,7 @@ func main() {
 			if err != nil {
 				slog.Error("failed to sync host into database", "error", err)
 				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database, please see error %v.\n", err)
+				closeResource()
 				os.Exit(1)
 			}
 		default:
@@ -293,16 +349,24 @@ func main() {
 			if err != nil {
 				slog.Error("failed to sync host into database", "error", err)
 				_, _ = fmt.Fprintf(os.Stderr, "Failed to sync host into database, please see error %v.\n", err)
+				closeResource()
 				os.Exit(1)
 			}
 		}
 		err = sshParser.DumpCheckSum(filePath)
 		if err != nil {
 			slog.Error("Failed to dump checksum of config file", "error", err)
-			_, _ = fmt.Fprintf(os.Stderr, "Sync finished but errored when dumping checksum of given config file")
+			_, _ = fmt.Fprintf(os.Stderr, "Sync finished but errored when dumping checksum of given config file\n")
+			closeResource()
 			os.Exit(1)
 		}
-		os.Exit(0)
+		if createSSHConfigFile(dbAO, cfg.GetSshConfigFilePath()) != nil {
+			slog.Error("could not write ssh config file out")
+			_, _ = fmt.Fprint(os.Stderr, "Failed to write ssh config file out\n")
+			closeResource()
+			os.Exit(1)
+		}
+		return
 	}
 
 	if *quickEdit {
@@ -316,6 +380,7 @@ func main() {
 		if err != nil {
 			slog.Error("Error getting host", "error", err)
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to get host, please verify host is valid\n")
+			closeResource()
 			os.Exit(1)
 		}
 		//convert hostOpts to a map of host-ops, note its a list due to a couple of options that can muti values
@@ -367,17 +432,24 @@ func main() {
 				})
 			}
 		}
-
-		os.Exit(0)
+		if createSSHConfigFile(dbAO, cfg.GetSshConfigFilePath()) != nil {
+			slog.Error("could not write ssh config file out")
+			_, _ = fmt.Fprint(os.Stderr, "Failed to write ssh config file out\n")
+			closeResource()
+			os.Exit(1)
+		}
+		return
 	}
 	if *quickAdd {
 		// handle quick add here
 		if !host.SetByUser {
 			_, _ = fmt.Fprint(os.Stderr, "Host must be set when adding a host")
+			closeResource()
 			os.Exit(1)
 		}
 		if !hostname.SetByUser {
 			_, _ = fmt.Fprint(os.Stderr, "HostName must be set when adding a host")
+			closeResource()
 			os.Exit(1)
 		}
 		hOptions := make([]sqlite.HostOptions, 0)
@@ -410,14 +482,23 @@ func main() {
 		err := dbAO.Insert(sqHost)
 		if err != nil {
 			slog.Error("Failed to add host to host table", "error", err)
+			_, _ = fmt.Fprint(os.Stderr, "Failed to add host to host table\n")
+			closeResource()
 			os.Exit(1)
 		}
-		os.Exit(0)
+		if sshParser.AddHostToFile(cfg.GetSshConfigFilePath(), sqHost) != nil {
+			slog.Error("Failed to add host to ssh config file", "error", err)
+			_, _ = fmt.Fprint(os.Stderr, "Failed to write ssh config file out\n")
+			closeResource()
+			os.Exit(1)
+		}
+		return
 	}
 	if *quickDelete {
 		// handle quick delete here
 		if !host.SetByUser {
 			_, _ = fmt.Fprint(os.Stderr, "Host needs to be set when using quick delete")
+			closeResource()
 			os.Exit(1)
 		}
 		err := dbAO.Delete(sqlite.Host{
@@ -425,9 +506,16 @@ func main() {
 		})
 		if err != nil {
 			slog.Warn("Failed to delete host from table, or host does not exist in the table", "error", err)
+			closeResource()
 			os.Exit(1)
 		}
-		os.Exit(0)
+		if createSSHConfigFile(dbAO, cfg.GetSshConfigFilePath()) != nil {
+			slog.Error("could not write ssh config file out")
+			_, _ = fmt.Fprint(os.Stderr, "Failed to write ssh config file out\n")
+			closeResource()
+			os.Exit(1)
+		}
+		return
 	}
 
 	/*
@@ -466,4 +554,12 @@ func createSSHCommand(host string, sshPath string, configPath string, options ..
 		c = exec.Command(sshPath, args...)
 	}
 	return c
+}
+
+func createSSHConfigFile(db *sqlite.HostDao, filePath string) error {
+	allHosts, err := db.GetAll()
+	if err != nil {
+		return err
+	}
+	return sshParser.SerializeHostToFile(filePath, allHosts)
 }
