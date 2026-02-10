@@ -94,3 +94,23 @@ func createSQLiteDataStorePath() error {
 	}
 	return nil
 }
+
+func DeInitProjectStructure() error {
+	if err := deleteConfigLocations(); err != nil {
+		return err
+	}
+	if err := deleteDataLocations(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteConfigLocations() error {
+	configRoot := filepath.Dir(filepath.Join(xdg.ConfigHome, config.AppName, config.SshConfigPath))
+	return os.RemoveAll(configRoot)
+}
+
+func deleteDataLocations() error {
+	dataRoot := filepath.Join(xdg.DataHome, config.DefaultAppStorePath)
+	return os.RemoveAll(dataRoot)
+}

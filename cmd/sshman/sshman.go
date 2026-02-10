@@ -50,6 +50,7 @@ func main() {
 	logFile := flag.Bool("logFile", true, "set output of logger to log file instead of terminal")
 	// first run flag -- init
 	init := flag.Bool("init", false, "initialize ssh-man")
+	de_init := flag.Bool("uninstall", false, "delete ssh-man owned resources")
 	// quick action commands
 	quickAdd := flag.Bool("qa", false, "quick add")
 	quickDelete := flag.Bool("qd", false, "quick delete")
@@ -140,6 +141,16 @@ func main() {
 		err := utils.InitProjectStructure()
 		if err != nil {
 			slog.Error("Failed to initialize project structure", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *de_init {
+		// delete owned resources then quit
+		err := utils.DeInitProjectStructure()
+		if err != nil {
+			fmt.Printf("Failed to delete owned resources. Error: %v\n", err)
 			os.Exit(1)
 		}
 		return
