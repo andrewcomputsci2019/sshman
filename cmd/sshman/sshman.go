@@ -226,6 +226,7 @@ func main() {
 			closeResource()
 			os.Exit(1)
 		}
+		return
 	}
 
 	/*
