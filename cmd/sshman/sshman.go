@@ -9,6 +9,7 @@ import (
 	"andrew/sshman/internal/sshUtils"
 	"andrew/sshman/internal/tui"
 	"andrew/sshman/internal/utils"
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -111,7 +112,7 @@ func main() {
 			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelInfo,
 			})))
-		case "warning":
+		case "warn":
 			slog.SetDefault(slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				Level: slog.LevelWarn,
 			})))
@@ -147,6 +148,18 @@ func main() {
 	}
 
 	if *de_init {
+		fmt.Printf("Do you want to delete/uninstall ssh-man [Y/N]\n")
+		ioReader := bufio.NewReader(os.Stdin)
+		if input, err := ioReader.ReadString('\n'); err != nil {
+			slog.Error("failed to get user input from stdin", "error", err)
+			os.Exit(1)
+		} else {
+			if strings.ToLower(input) != "y" {
+				fmt.Printf("Aborting uninstall event\n")
+				return
+			}
+		}
+
 		// delete owned resources then quit
 		err := utils.DeInitProjectStructure()
 		if err != nil {
