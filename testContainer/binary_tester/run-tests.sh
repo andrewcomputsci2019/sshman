@@ -36,7 +36,7 @@ SSH_PASS="${TEST_SSH_PASS:-"password"}"
 # TEST 1
 # -------------------------
 SPIN "init creates dirs & config"
-ssh-man-init >/tmp/init.log 2>&1 || FAIL "init"
+ssh-man --init --log=debug --logFile=0 >/tmp/init.log 2>&1 || FAIL "init"
 [ -f "$XDG_CONFIG_HOME/ssh_man/config.yaml" ] || FAIL "app config yaml does note exist"
 [ -d "$XDG_CONFIG_HOME/ssh_man/ssh" ] || FAIL "ssh config directory does not exist"
 [ -d "$XDG_DATA_HOME/ssh_man/db/"] || FAIL "ssh database directory does not exist"
@@ -56,7 +56,7 @@ PASS "flag parsing"
 # TEST 3
 # -------------------------
 SPIN "register ssh host"
-ssh-man -qa \
+ssh-man -qa --log=debug --logFile=0 \
   --host dev-test \
   --hostname "$SSH_HOST" \
   --o "Port=$SSH_PORT" \
@@ -68,7 +68,7 @@ PASS "register ssh host"
 # Test 4
 # -------------------------
 SPIN "edit ssh host"
-ssh-man -qe \
+ssh-man -qe --log=debug --logFile=0 \
     --host dev-test \
     --o "User=newUser" \
     >/tmp/edit.log 2>&1 || FAIL "edit-host"
@@ -77,7 +77,7 @@ PASS "edit ssh host"
 # Test 5
 # -------------------------
 SPIN "print ssh host"
-ssh-man -gh \
+ssh-man -gh --log=debug --logFile=0 \
     --host dev-test \
     > /tmp/print.log 2>&1 || FAIL "print-host"
 grep -q "User newUser" /tmp/print.log || FAIL "print-host"
@@ -86,7 +86,7 @@ PASS "print ssh host"
 # Test 6
 # -------------------------
 SPIN "delete ssh host"
-ssh-man -qd \
+ssh-man -qd --log=debug --logFile=0 \
     --host dev-test \
     > /tmp/delete.log 2>&1 || FAIL "delete-host"
 PASS "delete-host"
@@ -94,7 +94,7 @@ PASS "delete-host"
 # Test 7
 # -------------------------
 SPIN "sync config file to internal database"
-ssh-man -qs \
+ssh-man -qs --log=debug --logFile=0 \
         -f /test/ssh_config \
         > /tmp/sync.log 2>&1 || FAIL "sync-file-part1"
 ssh-man -gh \
