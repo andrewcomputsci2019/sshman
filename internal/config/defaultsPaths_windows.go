@@ -2,7 +2,7 @@ package config
 
 const (
 	// DefaultAppConfigPath Should be prefixed with AppData
-	DefaultAppConfigPath = "ssh_man\\config.yml"
+	DefaultAppConfigPath = "ssh_man\\config.yaml"
 	// DefaultAppStorePath points to the path where app storage should go, note this should be prefixed with %APPDATA%
 	DefaultAppStorePath = "ssh_man\\"
 )
