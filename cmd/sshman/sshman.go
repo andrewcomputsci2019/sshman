@@ -457,6 +457,21 @@ func main() {
 				})
 			}
 		}
+		replacementList := make([]sqlite.HostOptions, 0)
+		for _, optArrays := range optMap {
+			for _, vals := range optArrays {
+				replacementList = append(replacementList, vals)
+			}
+		}
+		dbHost.UpdatedAt = new(time.Time)
+		*dbHost.UpdatedAt = time.Now()
+		dbHost.Options = replacementList
+		err = dbAO.Update(dbHost)
+		if err != nil {
+			slog.Error("failed to update host from quick edit command", "error", err, "updated-host", dbHost)
+			closeResource()
+			os.Exit(1)
+		}
 		if createSSHConfigFile(dbAO, cfg.GetSshConfigFilePath()) != nil {
 			slog.Error("could not write ssh config file out")
 			_, _ = fmt.Fprint(os.Stderr, "Failed to write ssh config file out\n")
