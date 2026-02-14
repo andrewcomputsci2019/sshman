@@ -35,7 +35,7 @@ var KeyGenTypeSet = map[string]struct{}{
 }
 
 type Config struct {
-	DevMode     bool
+	DevMode     bool          `yaml:"-"`
 	StorageConf StorageConfig `yaml:"storage_config"`
 	Ssh         SSH           `yaml:"ssh"`
 	EnablePing  bool          `yaml:"enable_ping"` // trys to ping host to see if they are up and reports their ping
