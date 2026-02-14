@@ -108,7 +108,7 @@ SPIN "test ssh using app generated config"
 export SSHPASS="$TEST_SSH_PASS"
 sshpass -e \
  ssh \
-    -F "$XDG_CONFIG_HOME/ssh_man/ssh/config"
+    -F "$XDG_CONFIG_HOME/ssh_man/ssh/config" \
     -o BatchMode=no \
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null \
