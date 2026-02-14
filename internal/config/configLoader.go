@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/adrg/xdg"
 	"github.com/goccy/go-yaml"
 )
 
@@ -16,13 +17,8 @@ var ymlString []byte
 func LoadConfig() Config {
 	// todo
 	cfg := Config{}
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "failed to get user home dir: %v", err)
-		slog.Error("failed to get user home dir", "err", err)
-		panic(err)
-	}
-	path := fmt.Sprintf("%s/%s", homeDir, DefaultAppConfigPath)
+	configBasePath := xdg.ConfigHome
+	path := filepath.Join(configBasePath, DefaultAppConfigPath)
 	file, err := os.ReadFile(path)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "failed to read config file: %v", err)
