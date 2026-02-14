@@ -14,5 +14,5 @@ services:
       context: .
       dockerfile: ssh_runner/Dockerfile
     ports:
-      - 2222
+      - "2222:22"
   
