@@ -232,14 +232,14 @@ func main() {
 			closeResource()
 			os.Exit(1)
 		}
-		fmt.Printf("Database compliant definition: %v\n", storedHost)
+		fmt.Printf("Database compliant definition:\n %v\n", storedHost)
 		hStr, err := sshParser.ConvertSQLiteHostToString(&storedHost)
 		if err != nil {
 			slog.Error("Failed to convert host into ssh compliant string", "error", err)
 			closeResource()
 			os.Exit(1)
 		}
-		fmt.Printf("SSH Config compliant definition: %v\n", hStr)
+		fmt.Printf("SSH Config compliant definition:\n %v\n", hStr)
 		return
 	}
 
