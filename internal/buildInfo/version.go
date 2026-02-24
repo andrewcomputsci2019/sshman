@@ -6,7 +6,7 @@ const ProgramName = "sshman"
 const BuildMajor = 0
 
 // BuildMinor minor build version
-const BuildMinor = 0
+const BuildMinor = 9
 
 // BuildPatch patch build version
 const BuildPatch = 0
