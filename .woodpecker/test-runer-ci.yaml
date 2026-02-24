@@ -1,5 +1,10 @@
 when:
   event: pull_request
+  paths:
+    include:
+      - "go.mod"
+      - "go.sum"
+      - "**/*.go"
 steps:
   - name: unit-test
     image: docker.io/golang:1.25
