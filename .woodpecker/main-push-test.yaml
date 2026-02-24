@@ -1,6 +1,11 @@
 when:
   event: push
   branch: main
+  path:
+    include:
+      - "go.mod"
+      - "go.sum"
+      - "**/*.go"
 
 services:
   - name: ssh-server
