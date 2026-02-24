@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -21,8 +24,39 @@ type UpdateInfo struct {
 
 func CheckForUpdate() UpdateInfo {
 	// function checks GitHub releases for new versions that exist
-	panic("todo")
-	return UpdateInfo{}
+	currentBuildVersion := getCurrentBuildVersion()
+	return checkForUpdate(currentBuildVersion)
+}
+
+func checkForUpdate(currentBuildVersion string) UpdateInfo {
+	updateInfo := UpdateInfo{}
+	latestBuild, err := getLatestReleaseVersion()
+	if err != nil {
+		slog.Error("Failed to get latest release", "error", err)
+		return updateInfo
+	}
+
+	updateInfo.CurrentVersion = currentBuildVersion
+	updateInfo.LatestVersion = latestBuild
+
+	currentBuildVersion = strings.TrimPrefix(currentBuildVersion, "v")
+	latestVersion := strings.TrimPrefix(getCurrentBuildVersion(), "v")
+
+	currentVersions := strings.Split(currentBuildVersion, ".")
+	if len(currentVersions) != 3 {
+		slog.Error("Failed to extract versions from current build", "error", fmt.Sprintf("Expected 3 versions but got %d", len(currentVersions)))
+		return UpdateInfo{}
+	}
+	releaseVersions := strings.Split(latestVersion, ".")
+	if len(releaseVersions) != 3 {
+		slog.Error("Failed to extract versions from release build", "error", fmt.Sprintf("Expected 3 versions but got %d", len(releaseVersions)))
+	}
+
+	order := slices.Compare(currentVersions, releaseVersions)
+	if order < 0 {
+		updateInfo.UpdateAvailable = true
+	}
+	return updateInfo
 }
 
 func UpdateApplication() error {

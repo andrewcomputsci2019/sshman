@@ -26,3 +26,22 @@ func TestGetCurrentBuildVersion(t *testing.T) {
 		t.Errorf("Expected string to be %v but got %v", expected, getCurrentBuildVersion())
 	}
 }
+
+func TestCheckForUpdateNormal(t *testing.T) {
+	updateInfo := CheckForUpdate()
+	if updateInfo.UpdateAvailable {
+		t.Error("UpdateAvailable should be false")
+	}
+	if updateInfo.LatestVersion != updateInfo.CurrentVersion || updateInfo.CurrentVersion != getCurrentBuildVersion() {
+		t.Errorf("updateInfo holds incorrect versioning either latest doest not much current or currentVersion is not correct. updateInfo: %v", updateInfo)
+	}
+
+}
+
+func TestCheckForUpdateSpoofVersion(t *testing.T) {
+	// fictitious version less than current release
+	updateInfo := checkForUpdate("v0.8.0")
+	if !updateInfo.UpdateAvailable {
+		t.Error("UpdateAvailable should be true")
+	}
+}
