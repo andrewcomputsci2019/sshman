@@ -28,6 +28,7 @@ steps:
           netcat-openbsd
       # build
       - go build -o ssh-man ./cmd/sshman/
+      - mv ssh-man /usr/local/bin/ssh-man
       - mkdir -p /test
       - |
         cat <<EOF >/test/ssh_config
