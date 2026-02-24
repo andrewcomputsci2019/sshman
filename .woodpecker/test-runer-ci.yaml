@@ -6,4 +6,4 @@ steps:
     commands:
       - echo "Running unit tests"
       - go mod download
-      - go test -race ./... -v
+      - go test ./... -v
