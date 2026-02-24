@@ -1,6 +1,6 @@
 when:
   event: pull_request
-  paths:
+  path:
     include:
       - "go.mod"
       - "go.sum"
