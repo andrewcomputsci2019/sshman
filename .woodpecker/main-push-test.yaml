@@ -1,0 +1,39 @@
+when:
+  event: push
+  branch: main
+
+services:
+  - name: ssh-server
+    image: docker.io/linuxserver/openssh-server
+    environment:
+      PASSWORD_ACCESS: "true"
+      USER_PASSWORD: "password"
+      USER_NAME: "test"
+steps:
+  - name: integration-test
+    image: docker.io/golang:1.25
+    commands:
+      # install required
+      - apt-get update
+      - apt-get install -y sshpass openssh-client
+      - apt-get install -y netcat
+      - go build -o ssh-man ./cmd/sshman/
+      - mkdir -p /test
+      - |
+        cat <<EOF >/test/ssh_config
+        Host dev-test
+            HostName ssh-server
+            User test
+            Port 22
+        EOF
+      - |
+        until nc -z ssh-server 22; do
+          sleep 1
+        done
+      # export required env vars
+      - export TEST_SSH_HOST=ssh-server
+      - export TEST_SSH_PORT=22
+      - export TEST_SSH_USER=test
+      - export TEST_SSH_PASS=password
+      - chmod +x ./testContainer/binary_tester/run-tests.sh
+      - ./testContainer/binary_tester/run-tests.sh

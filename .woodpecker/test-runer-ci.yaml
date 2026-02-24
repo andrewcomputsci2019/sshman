@@ -1,0 +1,9 @@
+when:
+  event: pull_request
+steps:
+  - name: unit-test
+    image: docker.io/golang:1.25
+    commands:
+      - echo "Running unit tests"
+      - go mod download
+      - go test -race ./... -v
