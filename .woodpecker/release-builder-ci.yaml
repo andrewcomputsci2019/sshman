@@ -1,0 +1,34 @@
+when:
+  event: tag
+
+steps:
+  - name: release-build
+    image: docker.io/golang:1.25
+    commands:
+      - mkdir dist
+      - VERSION=${CI_COMMIT_TAG}
+      - BUILDDATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - echo "building ssh-man version ${VERSION} release artifacts"
+      - |
+        for GOOS in linux darwin windows; do
+          for GOARCH in amd64 arm64; do
+            EXT=""
+            if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+
+            GOOS=$GOOS GOARCH=$GOARCH \
+            go build \
+              -trimpath \
+              -ldflags "-s -w -X andrew/sshman/internal/buildInfo.BuildDate=$BUILDDATE" \
+              -o dist/ssh-man-$GOOS-$GOARCH$EXT \
+              ./cmd/sshman
+          done
+        done
+      - cd dist
+      - sha256sum * > checksums.txt
+  - name: publish-release
+    image: woodpeckerci/plugin-release
+    settings:
+      api_key:
+        from_secret: GITHUB_TOKEN
+      files:
+        - dist/*
