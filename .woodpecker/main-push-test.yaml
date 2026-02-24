@@ -6,6 +6,7 @@ when:
       - "go.mod"
       - "go.sum"
       - "**/*.go"
+      - ".woodpecker/main-push-test.yaml"
 
 services:
   - name: ssh-server
