@@ -7,36 +7,43 @@ steps:
     commands:
       - apt-get update
       - apt-get install -y --no-install-recommends zip
-      - mkdir dist
-      - VERSION=${CI_COMMIT_TAG}
-      - BUILDDATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-      - echo "building ssh-man version ${VERSION} release artifacts"
       - |
+        set -e
+        mkdir -p dist
+
+        VERSION="${CI_COMMIT_TAG}"
+        BUILDDATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+        echo "building ssh-man version ${VERSION} release artifacts"
+
         for GOOS in linux darwin windows; do
           for GOARCH in amd64 arm64; do
+
             EXT=""
             if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
-        
+
             BIN="ssh-man${EXT}"
-        
+
             GOOS=$GOOS GOARCH=$GOARCH \
             go build \
               -trimpath \
-              -ldflags "-s -w -X andrew/sshman/internal/buildInfo.BuildDate=$BUILDDATE" \
+              -ldflags "-s -w \
+                -X andrew/sshman/internal/buildInfo.BuildDate=$BUILDDATE \
               -o $BIN \
               ./cmd/sshman
-        
+
             if [ "$GOOS" = "windows" ]; then
               zip "dist/ssh-man-${GOOS}-${GOARCH}.zip" $BIN
             else
               tar -czf "dist/ssh-man-${GOOS}-${GOARCH}.tar.gz" $BIN
             fi
+
             rm $BIN
-            echo "finished building ssh-man-${GOOS}-${GOARCH} build"
+            echo "finished building ssh-man-${GOOS}-${GOARCH}"
           done
         done
-      - cd dist
-      - sha256sum * > checksums.txt
+        cd dist
+        sha256sum * > checksums.txt
   - name: publish-release
     image: woodpeckerci/plugin-release
     settings:
