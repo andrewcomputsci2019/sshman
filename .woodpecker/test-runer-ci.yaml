@@ -5,6 +5,7 @@ when:
       - "go.mod"
       - "go.sum"
       - "**/*.go"
+      - ".woodpecker/test-runer-ci.yaml"
 steps:
   - name: unit-test
     image: docker.io/golang:1.25
