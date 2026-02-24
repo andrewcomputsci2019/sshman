@@ -1,5 +1,7 @@
 # SSH-MAN
 ![logo](./resources/logo_alt.png)
+[![build-status](https://woodpecker.andrewpegg.me/api/badges/1/status.svg)](https://woodpecker.andrewpegg.me/repos/1)
+
 An easy to use tui ssh manager, allows for easy viewing and adding of new ssh connections. Written in go and powered by cham's Bubble Tea tui framework. Uses vim like keybinds to keep tui navigation simple and familiar to use.
 
 ## Overview
