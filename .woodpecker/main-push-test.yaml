@@ -20,11 +20,12 @@ steps:
     image: docker.io/golang:1.25
     commands:
       # install required
-      - apt-get update
-      - apt-get install -y --no-install-recommends \
-        sshpass \
-        openssh-client \
-        netcat-openbsd
+      - |
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          sshpass \
+          openssh-client \
+          netcat-openbsd
       # build
       - go build -o ssh-man ./cmd/sshman/
       - mkdir -p /test
