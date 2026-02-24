@@ -153,7 +153,7 @@ Below is table highlighting on the options that are tunable and their affect \
 ### Pre-built binaries
 Grab the latest binaries for your system from the GitHub release.
 Or if you are on a unix like system, you can use the provided shell script to auto install 
-ssh-man. The script does assume curl exist on the system.
+ssh-man. The script does assume curl exist on the system. \
 run 
 ```bash
 wget -qO- https://raw.githubusercontent.com/andrewcomputsci2019/sshman/install.sh | bash
