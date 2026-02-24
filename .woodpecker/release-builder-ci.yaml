@@ -11,7 +11,7 @@ steps:
         set -e
         mkdir -p dist
 
-        VERSION="${CI_COMMIT_TAG}"
+        VERSION="$CI_COMMIT_TAG"
         BUILDDATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
         echo "building ssh-man version ${VERSION} release artifacts"
