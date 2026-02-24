@@ -13,7 +13,7 @@ func TestPingHost(t *testing.T) {
 	cancelCtx, cfun := context.WithCancel(context.Background())
 	defer cfun()
 	listenInstance := net.ListenConfig{}
-	listener, err := listenInstance.Listen(cancelCtx, "tcp", "localhost:")
+	listener, err := listenInstance.Listen(cancelCtx, "tcp", "127.0.0.1:")
 
 	if err != nil {
 		t.Fatalf("Failed to create tcp socket to listen on random port, ERROR: %v", err)
@@ -23,17 +23,8 @@ func TestPingHost(t *testing.T) {
 		t.Fatalf("Failed to get port from Addr string. Error: %v", err)
 	}
 	t.Logf("Listening on Addr %v", listener.Addr())
-	go func() {
-		defer listener.Close()
-		conn, err := listener.Accept()
-		if err != nil {
-			t.Logf("Was not able to accept connection. Error %v", err)
-		}
-		t.Logf("accepted connection from %v", conn.RemoteAddr())
-
-	}()
 	portNum, _ := strconv.Atoi(port)
-	res := PingRemoteHost("localhost", uint(portNum), time.Second*1)
+	res := PingRemoteHost("127.0.0.1", uint(portNum), time.Second*1)
 	if res.Err != nil {
 		t.Fatalf("Received error ping valid host. Error %v", res.Err)
 	}
