@@ -1,9 +1,14 @@
 # SSH-MAN
 ![logo](./resources/logo_alt.png)
+
+
+
+An easy-to-use tui ssh manager, allows for easy viewing and adding of new ssh connections. Written in go and powered by cham's Bubble Tea tui framework. Uses vim like keybinds to keep tui navigation simple and familiar to use.
+
 [![build-status](https://woodpecker.andrewpegg.me/api/badges/1/status.svg)](https://woodpecker.andrewpegg.me/repos/1)
-
-An easy to use tui ssh manager, allows for easy viewing and adding of new ssh connections. Written in go and powered by cham's Bubble Tea tui framework. Uses vim like keybinds to keep tui navigation simple and familiar to use.
-
+![GitHub Release](https://img.shields.io/github/v/release/andrewcomputsci2019/sshman)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/andrewcomputsci2019/sshman)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/andrewcomputsci2019/sshman)
 ## Overview
 ssh-man is a lightweight, SSH configuration manager that sits above your existing SSH setup rather than replacing it. Instead of reinventing the SSH layer, ssh-man delegates all connections to the platform-provided OpenSSH binary, ensuring full compatibility with standard SSH workflows, agents, and configs.
 
