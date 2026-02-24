@@ -32,7 +32,7 @@ steps:
               tar -czf "dist/ssh-man-${GOOS}-${GOARCH}.tar.gz" $BIN
             fi
             rm $BIN
-        
+            echo "finished building ssh-man-${GOOS}-${GOARCH} build"
           done
         done
       - cd dist
