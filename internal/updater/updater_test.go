@@ -45,3 +45,9 @@ func TestCheckForUpdateSpoofVersion(t *testing.T) {
 		t.Error("UpdateAvailable should be true")
 	}
 }
+
+func TestUpdateApplication(t *testing.T) {
+	if err := UpdateApplication(true); err != nil {
+		t.Error(err)
+	}
+}

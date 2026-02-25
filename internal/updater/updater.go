@@ -2,18 +2,29 @@ package updater
 
 import (
 	"andrew/sshman/internal/buildInfo"
+	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
+
+	"github.com/hashicorp/go-extract"
 )
 
 const (
 	latestReleaseURL = "https://api.github.com/repos/andrewcomputsci2019/sshman/releases/latest"
+	DownloadURL      = "https://github.com/andrewcomputsci2019/sshman/releases/latest/download/%s"
 )
 
 type UpdateInfo struct {
@@ -59,11 +70,164 @@ func checkForUpdate(currentBuildVersion string) UpdateInfo {
 	return updateInfo
 }
 
-func UpdateApplication() error {
-	panic("todo")
-	return nil
+func UpdateApplication(dryRun bool) error {
 	// this function will download the new binary
 	// compare checksum, extract and replace the current binary and return nil if all works
+	if buildInfo.BUILD_OS == "windows" {
+		return errors.New("windows does not support update function")
+	}
+	checksumFileName, archiveFileName := getDownloadStrings()
+	currentBinaryPath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	currentBinaryPath, err = filepath.EvalSymlinks(currentBinaryPath)
+	if err != nil {
+		return err
+	}
+	binDir := filepath.Dir(currentBinaryPath)
+	tempDir, err := os.MkdirTemp(binDir, ".sshman-update-*")
+	if err != nil {
+		return err
+	}
+
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+			slog.Warn("Failed to remove temporary directory", "path", path, "error", err)
+		}
+	}(tempDir)
+
+	checkFile, err := os.Create(filepath.Join(tempDir, checksumFileName))
+	if err != nil {
+		return err
+	}
+	defer checkFile.Close()
+
+	archiveFile, err := os.Create(filepath.Join(tempDir, archiveFileName))
+	if err != nil {
+		return err
+	}
+	defer archiveFile.Close()
+
+	if err := downloadFile(fmt.Sprintf(DownloadURL, checksumFileName), checkFile); err != nil {
+		return err
+	}
+	if err := downloadFile(fmt.Sprintf(DownloadURL, archiveFileName), archiveFile); err != nil {
+		return err
+	}
+
+	if err := rewindFile(archiveFile); err != nil {
+		return err
+	}
+
+	if err := rewindFile(checkFile); err != nil {
+		return err
+	}
+
+	checker := sha256.New()
+
+	if _, err := io.Copy(checker, archiveFile); err != nil {
+		return err
+	}
+
+	sumString := hex.EncodeToString(checker.Sum(nil))
+
+	if err := checkChecksumFile(checkFile, sumString, archiveFileName); err != nil {
+		return err
+	}
+
+	if err := rewindFile(archiveFile); err != nil {
+		return err
+	}
+
+	if err := extract.Unpack(context.Background(), tempDir, archiveFile, extract.NewConfig()); err != nil {
+		return err
+	}
+
+	if err := checkFile.Close(); err != nil {
+		slog.Warn("Failed to close file", "path", filepath.Join(tempDir, checksumFileName), "error", err)
+	}
+	if err := archiveFile.Close(); err != nil {
+		slog.Warn("Failed to close file", "path", filepath.Join(tempDir, archiveFileName), "error", err)
+	}
+
+	if dryRun {
+		return os.RemoveAll(tempDir)
+	}
+
+	if err := replaceBinaryFile(filepath.Join(tempDir, getExecutableName()), currentBinaryPath); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(tempDir); err != nil {
+		slog.Warn("Failed to remove temporary directory", "path", tempDir, "error", err)
+	}
+	// kinda trippy method but we are going to evoke the new binary which will cause it to restart, this does have the counter
+	return syscall.Exec(currentBinaryPath, os.Args, os.Environ())
+}
+
+func checkChecksumFile(checkFile *os.File, expectedHash, expectedFile string) error {
+	scanner := bufio.NewScanner(checkFile)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) != 2 {
+			continue
+		}
+
+		if fields[0] == expectedHash && fields[1] == expectedFile {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("checksum mismatch for %s", expectedFile)
+}
+
+func downloadFile(url string, destFile *os.File) error {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	resp, err := client.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad HTTP status code: %d", resp.StatusCode)
+	}
+	_, err = io.Copy(destFile, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getDownloadStrings() (string, string) {
+	checksumFileName := "checksums.txt"
+	archiveFileName := fmt.Sprintf("ssh-man-%s-%s.tar.gz", buildInfo.BUILD_OS, buildInfo.BUILD_ARC)
+	return checksumFileName, archiveFileName
+}
+
+func getExecutableName() string {
+	return "ssh-man"
+}
+
+func rewindFile(file *os.File) error {
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	return nil
+}
+
+func replaceBinaryFile(newBinaryPath string, oldBinaryPath string) error {
+	if err := os.Chmod(newBinaryPath, 0755); err != nil {
+		return err
+	}
+
+	if err := os.Rename(newBinaryPath, oldBinaryPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 func getCurrentBuildVersion() string {
