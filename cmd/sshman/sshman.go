@@ -156,7 +156,7 @@ func main() {
 			slog.Error("failed to get user input from stdin", "error", err)
 			os.Exit(1)
 		} else {
-			if strings.ToLower(input) != "y" {
+			if strings.TrimSpace(strings.ToLower(input)) != "y" {
 				fmt.Printf("Aborting uninstall event\n")
 				return
 			}
@@ -180,7 +180,7 @@ func main() {
 			}
 			fmt.Printf("Do you want to automatically update? [Y/n]\n")
 			reader := bufio.NewReader(os.Stdin)
-			if input, err := reader.ReadString('\n'); err != nil || strings.ToLower(input) != "y" {
+			if input, err := reader.ReadString('\n'); err != nil || strings.TrimSpace(strings.ToLower(input)) != "y" {
 				fmt.Printf("Declining automatic upate\n")
 				return
 			}
