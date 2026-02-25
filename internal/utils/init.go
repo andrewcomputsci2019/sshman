@@ -30,7 +30,6 @@ func InitProjectStructure() error {
 		return err
 	}
 	err = createSQLiteDataStorePath()
-	// todo dump default config into file
 	cfg := config.GetDefaultConfig()
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
@@ -49,8 +48,6 @@ func InitProjectStructure() error {
 	}
 	return nil
 }
-
-// todo test init function and verify that it correctly creates necessary program directories
 
 // createKeyStorageIfNotExist creates the dir of $XDG_CONFIG_HOME/ssh_man/ssh/keystore
 func createKeyStorageIfNotExist() error {
