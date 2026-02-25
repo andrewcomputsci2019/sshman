@@ -51,7 +51,7 @@ func checkForUpdate(currentBuildVersion string) UpdateInfo {
 	updateInfo.LatestVersion = latestBuild
 
 	currentBuildVersion = strings.TrimPrefix(currentBuildVersion, "v")
-	latestVersion := strings.TrimPrefix(getCurrentBuildVersion(), "v")
+	latestVersion := strings.TrimPrefix(latestBuild, "v")
 
 	currentVersions := strings.Split(currentBuildVersion, ".")
 	if len(currentVersions) != 3 {
