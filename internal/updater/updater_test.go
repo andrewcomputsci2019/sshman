@@ -40,7 +40,7 @@ func TestCheckForUpdateNormal(t *testing.T) {
 
 func TestCheckForUpdateSpoofVersion(t *testing.T) {
 	// fictitious version less than current release
-	updateInfo := checkForUpdate("v0.8.0")
+	updateInfo := checkForUpdate("v1.0.0")
 	if !updateInfo.UpdateAvailable {
 		t.Error("UpdateAvailable should be true")
 	}
