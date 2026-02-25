@@ -6,10 +6,10 @@ const ProgramName = "sshman"
 const BuildMajor = 1
 
 // BuildMinor minor build version
-const BuildMinor = 0
+const BuildMinor = 1
 
 // BuildPatch patch build version
-const BuildPatch = 1
+const BuildPatch = 0
 
 // BuildDate specifies the build date of the application
 var BuildDate string
