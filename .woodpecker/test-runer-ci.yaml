@@ -6,6 +6,8 @@ when:
       - "go.sum"
       - "**/*.go"
       - ".woodpecker/test-runer-ci.yaml"
+    exclude:
+      - "internal/buildInfo/version.go"
 steps:
   - name: unit-test
     image: docker.io/golang:1.25
