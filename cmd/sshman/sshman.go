@@ -174,7 +174,16 @@ func main() {
 	if *updateCheck {
 		updateInfo := updater.CheckForUpdate()
 		if updateInfo.UpdateAvailable {
-			fmt.Printf("Update available. Upgrading from version %s to version %s\n", updateInfo.CurrentVersion, updateInfo.LatestVersion)
+			fmt.Printf("Update available at https://github.com/andrewcomputsci2019/sshman/releases/latest\n")
+			if buildInfo.BUILD_OS == "windows" {
+				return
+			}
+			fmt.Printf("Do you want to automatically update? [Y/n]\n")
+			reader := bufio.NewReader(os.Stdin)
+			if input, err := reader.ReadString('\n'); err != nil || strings.ToLower(input) != "y" {
+				fmt.Printf("Declining automatic upate\n")
+				return
+			}
 			fmt.Printf("Dry Run Enabled %v\n", strconv.FormatBool(*dryRun))
 			err := updater.UpdateApplication(*dryRun)
 			if err != nil {
