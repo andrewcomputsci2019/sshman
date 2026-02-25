@@ -15,10 +15,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -95,7 +95,13 @@ func main() {
 		var writer io.Writer
 		lowerCase := strings.ToLower(*logLevel)
 		if *logFile {
-			logFile, err := os.Create(path.Join(xdg.DataHome, config.DefaultAppStorePath, "app.log"))
+			logPath := filepath.Join(xdg.DataHome, config.DefaultAppStorePath, "app.log")
+			logDir := filepath.Dir(logPath)
+			if err := os.MkdirAll(logDir, 0750); err != nil {
+				log.Fatalf("failed to create log directory %s: %s", logDir, err)
+				return
+			}
+			logFile, err := os.Create(logPath)
 			if err != nil {
 				fmt.Printf("Failed to initialize logger")
 				return
