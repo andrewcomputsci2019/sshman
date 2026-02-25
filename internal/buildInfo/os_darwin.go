@@ -1,3 +1,3 @@
 package buildInfo
 
-const BUILD_OS = "mac"
+const BUILD_OS = "darwin"
