@@ -8,6 +8,7 @@ import (
 	"andrew/sshman/internal/sshParser"
 	"andrew/sshman/internal/sshUtils"
 	"andrew/sshman/internal/tui"
+	"andrew/sshman/internal/updater"
 	"andrew/sshman/internal/utils"
 	"bufio"
 	"context"
@@ -51,7 +52,7 @@ func main() {
 	logFile := flag.Bool("logFile", true, "set output of logger to log file instead of terminal")
 	// first run flag -- init
 	init := flag.Bool("init", false, "initialize ssh-man")
-	de_init := flag.Bool("uninstall", false, "delete ssh-man owned resources")
+	deInit := flag.Bool("uninstall", false, "delete ssh-man owned resources")
 	// quick action commands
 	quickAdd := flag.Bool("qa", false, "quick add")
 	quickDelete := flag.Bool("qd", false, "quick delete")
@@ -63,7 +64,8 @@ func main() {
 	// get host relies on user setting host alias flag
 	getHost := flag.Bool("gh", false, "get a host config definition and print it")
 	createConfigFlag := flag.Bool("cc", false, "create ssh config using sqlite database")
-	_ = flag.Bool("update", false, "checks for an available update, on unix may prompt for auto update")
+	updateCheck := flag.Bool("update", false, "checks for an available update, on unix may prompt for auto update")
+	dryRun := flag.Bool("dry-run", false, "dry run update, runs update procedure but does not modify os")
 	// validate config flag
 	validateConfig := flag.Bool("validate", false, "validate configuration")
 	printConfig := flag.Bool("parse-config", false, "print configuration")
@@ -147,7 +149,7 @@ func main() {
 		return
 	}
 
-	if *de_init {
+	if *deInit {
 		fmt.Printf("Do you want to delete/uninstall ssh-man [Y/N]\n")
 		ioReader := bufio.NewReader(os.Stdin)
 		if input, err := ioReader.ReadString('\n'); err != nil {
@@ -167,6 +169,19 @@ func main() {
 			os.Exit(1)
 		}
 		return
+	}
+
+	if *updateCheck {
+		updateInfo := updater.CheckForUpdate()
+		if updateInfo.UpdateAvailable {
+			fmt.Printf("Update available. Upgrading from version %s to version %s\n", updateInfo.CurrentVersion, updateInfo.LatestVersion)
+			fmt.Printf("Dry Run Enabled %v\n", strconv.FormatBool(*dryRun))
+			err := updater.UpdateApplication(*dryRun)
+			if err != nil {
+				slog.Error("Failed to update application", "error", err)
+				return
+			}
+		}
 	}
 
 	/*
