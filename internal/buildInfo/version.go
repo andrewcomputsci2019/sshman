@@ -3,10 +3,10 @@ package buildInfo
 const ProgramName = "sshman"
 
 // BuildMajor major build version
-const BuildMajor = 0
+const BuildMajor = 1
 
 // BuildMinor minor build version
-const BuildMinor = 9
+const BuildMinor = 0
 
 // BuildPatch patch build version
 const BuildPatch = 0
