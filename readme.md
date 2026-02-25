@@ -164,11 +164,11 @@ Or if you are on a unix like system, you can use the provided shell script to au
 ssh-man. The script does assume curl exist on the system. \
 run 
 ```bash
-wget -qO- https://raw.githubusercontent.com/andrewcomputsci2019/sshman/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/andrewcomputsci2019/sshman/refs/heads/main/install.sh | bash
 ```
 or
 ```bash
-curl -fsSL https://raw.githubusercontent.com/andrewcomputsci2019/sshman/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/andrewcomputsci2019/sshman/refs/heads/main/install.sh | bash
 ```
 ### Build form source
 due to the low number of dependencies building from source is quite manageable option.
