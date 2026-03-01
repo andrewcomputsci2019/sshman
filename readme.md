@@ -154,8 +154,14 @@ Below is table highlighting on the options that are tunable and their affect \
 | ssh.acceptable_key_algorithms  | [RSA,ECDSA,ED25519]                | you can disable the ability to generate keys of certain types by replacing them, by default all secure types are allowed                                                                                                        |
 | ssh.remove_pub_after_gen       | TRUE\|FALSE                        | removes public keys after rotations                                                                                                                                                                                             |
 | enable_ping                    | TRUE\|FALSE                        | enables the ability for ssh-man to dial host to check their availability                                                                                                                                                        |
-## Screen Shots and Demos
 
+## Screen Shots and Demos
+![adding a host](resources/add_host.gif)
+![editing a host](resources/edit_host.gif)
+![creating a key](resources/create_key.gif)
+![rotate a key](resources/rotate_key.gif)
+![connecting to a host](resources/connect_host.gif)
+![deleting a host](resources/delete_host.gif)
 
 ## Installing
 ### Pre-built binaries
@@ -210,6 +216,9 @@ ssh-man follows vim in its style of key binds and thus should be familiar to tho
 | a        | add a host              |
 | d        | delete a host           |
 | enter    | connect to a host       |
+| /        | search for a host       |
+| esc      | cancel focus            |
+
 ### Wizards
 
 | key bind  | tooltip                                                                               |
