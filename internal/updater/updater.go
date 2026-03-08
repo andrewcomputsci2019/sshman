@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -53,14 +54,31 @@ func checkForUpdate(currentBuildVersion string) UpdateInfo {
 	currentBuildVersion = strings.TrimPrefix(currentBuildVersion, "v")
 	latestVersion := strings.TrimPrefix(latestBuild, "v")
 
-	currentVersions := strings.Split(currentBuildVersion, ".")
-	if len(currentVersions) != 3 {
-		slog.Error("Failed to extract versions from current build", "error", fmt.Sprintf("Expected 3 versions but got %d", len(currentVersions)))
-		return UpdateInfo{}
+	tSlice := strings.Split(currentBuildVersion, ".")
+	if len(tSlice) != 3 {
+		slog.Error("Failed to extract versions from current build", "error", fmt.Sprintf("Expected 3 versions but got %d", len(tSlice)))
+		return updateInfo
 	}
-	releaseVersions := strings.Split(latestVersion, ".")
-	if len(releaseVersions) != 3 {
-		slog.Error("Failed to extract versions from release build", "error", fmt.Sprintf("Expected 3 versions but got %d", len(releaseVersions)))
+	currentVersions := []int{0, 0, 0}
+	for i, v := range tSlice {
+		currentVersions[i], err = strconv.Atoi(v)
+		if err != nil {
+			slog.Error("Failed to extract versions from current build", "error", err)
+			return updateInfo
+		}
+	}
+	tSlice = strings.Split(latestVersion, ".")
+	if len(tSlice) != 3 {
+		slog.Error("Failed to extract versions from release build", "error", fmt.Sprintf("Expected 3 versions but got %d", len(tSlice)))
+		return updateInfo
+	}
+	releaseVersions := []int{0, 0, 0}
+	for i, v := range tSlice {
+		releaseVersions[i], err = strconv.Atoi(v)
+		if err != nil {
+			slog.Error("Failed to extract versions from release build", "error", err)
+			return updateInfo
+		}
 	}
 
 	order := slices.Compare(currentVersions, releaseVersions)
