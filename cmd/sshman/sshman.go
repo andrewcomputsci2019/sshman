@@ -187,15 +187,18 @@ func main() {
 			fmt.Printf("Do you want to automatically update? [Y/n]\n")
 			reader := bufio.NewReader(os.Stdin)
 			if input, err := reader.ReadString('\n'); err != nil || strings.TrimSpace(strings.ToLower(input)) != "y" {
-				fmt.Printf("Declining automatic upate\n")
+				fmt.Printf("Declining automatic update\n")
 				return
 			}
 			fmt.Printf("Dry Run Enabled %v\n", strconv.FormatBool(*dryRun))
 			err := updater.UpdateApplication(*dryRun)
 			if err != nil {
 				slog.Error("Failed to update application", "error", err)
-				return
+				fmt.Printf("Failed to update application, please see error in log\n")
+			} else {
+				fmt.Printf("Successfully updated application, please restart ssh-man\n")
 			}
+			return
 		}
 	}
 
