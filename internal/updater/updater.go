@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -175,14 +176,40 @@ func UpdateApplication(dryRun bool) error {
 	}
 
 	if err := replaceBinaryFile(filepath.Join(tempDir, getExecutableName()), currentBinaryPath); err != nil {
+		if errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EPERM) {
+			fmt.Println("App will prompt for sudo access to replace binary, please enter your password to continue")
+			err = runInstallExecutable(filepath.Join(tempDir, getExecutableName()), currentBinaryPath)
+			if err != nil {
+				slog.Error("Failed to replace binary", "error", err)
+				return err
+			}
+		}
 		return err
 	}
-
 	if err := os.RemoveAll(tempDir); err != nil {
 		slog.Warn("Failed to remove temporary directory", "path", tempDir, "error", err)
 	}
-	// kinda trippy method but we are going to evoke the new binary which will cause it to restart, this does have the counter
-	return syscall.Exec(currentBinaryPath, os.Args, os.Environ())
+	return nil
+}
+
+func runInstallExecutable(newBinPath, oldBinPath string) error {
+	// escalate privileges to replace binary
+	exc := exec.Command(
+		"sudo",
+		"install",
+		"-m",
+		"0755",
+		newBinPath,
+		oldBinPath,
+	)
+	exc.Stdout = os.Stdout
+	exc.Stderr = os.Stderr
+	exc.Stdin = os.Stdin
+	err := exc.Run()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func checkChecksumFile(checkFile *os.File, expectedHash, expectedFile string) error {
