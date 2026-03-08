@@ -104,8 +104,8 @@ func UpdateApplication(dryRun bool) error {
 	if err != nil {
 		return err
 	}
-	binDir := filepath.Dir(currentBinaryPath)
-	tempDir, err := os.MkdirTemp(binDir, ".sshman-update-*")
+
+	tempDir, err := os.MkdirTemp(os.TempDir(), ".sshman-update-*")
 	if err != nil {
 		return err
 	}
